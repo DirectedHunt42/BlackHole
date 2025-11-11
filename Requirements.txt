@@ -1,0 +1,5 @@
+customtkinter
+cryptography
+python-docx
+odfpy
+pyperclip
