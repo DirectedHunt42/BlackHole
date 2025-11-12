@@ -37,9 +37,7 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 
 - 🔐 **Local-Only Encryption** — All passwords are encrypted with your master password and stored on your device.  
 - 🧠 **Master Password System** — Set and manage one key to access your vault.  
-- 📁 **Automatic Save Path** — Data is saved in your AppData/Local `NovaFoundry/BlackHole` directory for security and portability.  
-- 💾 **Secure Database** — Uses a local JSON database for encrypted storage.  
-- 🧭 **Simple UI** — Built with CustomTkinter for a modern, minimal desktop experience.
+- 💾 **Secure Database** — Uses a local database for encrypted storage.
 
 ### Support
 [Buy me a coffee](https://buymeacoffee.com/novafoundry)
