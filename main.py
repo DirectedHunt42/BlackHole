@@ -21,7 +21,6 @@ local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
 nova_folder = os.path.join(local_appdata, "NovaFoundry")
 os.makedirs(nova_folder, exist_ok=True)
 
-db_path = os.path.join(nova_folder, "BlackHolePasswords.db")
 settings_path = os.path.join(nova_folder, "settings.json")
 
 # --- Theme (Deep Space Glow) colors ---
@@ -42,24 +41,6 @@ def derive_key(password: str, salt: bytes) -> bytes:
         backend=default_backend()
     )
     return urlsafe_b64encode(kdf.derive(password.encode()))
-
-# --- Initialize DB ---
-def init_db():
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS passwords (
-            id INTEGER PRIMARY KEY,
-            title TEXT,
-            username TEXT,
-            password TEXT,
-            notes TEXT
-        )
-    ''')
-    conn.commit()
-    return conn, c
-
-conn, c = init_db()
 
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
@@ -86,6 +67,9 @@ class PasswordManager(ctk.CTk):
         self.master_password = None
         self.fernet = None
         self.salt = None
+        self.db_path = None
+        self.conn = None
+        self.c = None
 
         # load settings
         self.settings = {"master_password_set": False}
@@ -95,11 +79,18 @@ class PasswordManager(ctk.CTk):
                     self.settings = json.load(f)
                 if "salt" in self.settings:
                     self.salt = urlsafe_b64decode(self.settings["salt"])
+                if "db_path" in self.settings:
+                    self.db_path = self.settings["db_path"]
             except Exception:
                 self.settings = {"master_password_set": False}
 
-        # show master password popup
-        success = self._show_master_password_modal()
+        # Check if setup is needed
+        if not self.settings.get("master_password_set", False) or not self.db_path:
+            success = self._show_setup_modal()
+        else:
+            self._init_db()
+            success = self._show_master_password_modal()
+
         if not success:
             self.destroy()
             sys.exit()
@@ -108,10 +99,11 @@ class PasswordManager(ctk.CTk):
         self.configure(fg_color=BG)
         self._build_ui()
         self.attributes('-alpha', 1.0)
+        self.state('zoomed')
         self.load_cards()
 
-    # --- Auth modal ---
-    def _show_master_password_modal(self):
+    # --- Setup modal: New or Import ---
+    def _show_setup_modal(self):
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
         popup.configure(fg_color=BG)
@@ -119,6 +111,220 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
 
         # Center popup
+        width, height = 480, 200
+        x = (popup.winfo_screenwidth() // 2) - (width // 2)
+        y = (popup.winfo_screenheight() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+
+        closed_by_user = {"val": True}
+
+        def on_close():
+            closed_by_user["val"] = True
+            popup.grab_release()
+            popup.destroy()
+
+        popup.protocol("WM_DELETE_WINDOW", on_close)
+
+        # Header
+        ctk.CTkLabel(popup, text="Black Hole — Setup",
+                     font=("Helvetica", 16, "bold"),
+                     text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+        ctk.CTkLabel(popup, text="Set up a new vault or import an existing one?",
+                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+
+        # Buttons
+        btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
+        btn_frame.pack(pady=(12,12))
+
+        def setup_new():
+            closed_by_user["val"] = False
+            popup.grab_release()
+            popup.destroy()
+            self._setup_new()
+
+        def setup_import():
+            closed_by_user["val"] = False
+            popup.grab_release()
+            popup.destroy()
+            self._setup_import()
+
+        ctk.CTkButton(btn_frame, text="New Vault", command=setup_new,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
+        ctk.CTkButton(btn_frame, text="Import Vault", command=setup_import,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
+
+        self.wait_window(popup)
+        return not closed_by_user["val"]
+
+    # --- Setup New ---
+    def _setup_new(self):
+        dir_path = filedialog.askdirectory(title="Select Folder for New Vault")
+        if not dir_path:
+            return False
+        self.db_path = os.path.join(dir_path, "BlackHolePasswords.db")
+        if os.path.exists(self.db_path):
+            if not messagebox.askyesno("Overwrite?", "Database already exists. Overwrite?"):
+                return False
+
+        success = self._show_master_create_modal()
+        if success:
+            self._init_db()
+            sync_key = urlsafe_b64encode(self.salt).decode()
+            self._show_sync_key_display_popup(sync_key)
+            try:
+                with open(settings_path, "w", encoding="utf-8") as sf:
+                    json.dump(self.settings, sf)
+            except Exception:
+                pass
+        return success
+
+    # --- Setup Import ---
+    def _setup_import(self):
+        file_path = filedialog.askopenfilename(title="Select Existing Vault DB", filetypes=[("Database Files", "*.db")])
+        if not file_path:
+            return False
+        self.db_path = file_path
+
+        # Prompt for sync key
+        key_success = self._show_sync_key_modal()
+        if not key_success:
+            return False
+
+        # Show master unlock modal
+        unlock_success = self._show_master_unlock_modal()
+        if not unlock_success:
+            return False
+
+        # Connect to DB and verify if possible
+        self._init_db()
+        try:
+            row = self.c.execute("SELECT password FROM passwords WHERE password IS NOT NULL LIMIT 1").fetchone()
+            if row and row[0]:
+                self.fernet.decrypt(row[0].encode())
+        except Exception:
+            messagebox.showerror("Error", "Incorrect sync key or master password!")
+            self.conn.close()
+            self.conn = None
+            self.c = None
+            return False
+
+        # Generate local verification
+        self.settings["verification"] = self.fernet.encrypt(b"VERIFICATION").decode()
+        self.settings["salt"] = urlsafe_b64encode(self.salt).decode()
+        self.settings["db_path"] = self.db_path
+        self.settings["master_password_set"] = True
+        try:
+            with open(settings_path, "w", encoding="utf-8") as sf:
+                json.dump(self.settings, sf)
+        except Exception:
+            pass
+        return True
+
+    # --- Sync Key input modal ---
+    def _show_sync_key_modal(self):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+
+        width, height = 480, 240
+        x = (popup.winfo_screenwidth() // 2) - (width // 2)
+        y = (popup.winfo_screenheight() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+
+        closed_by_user = {"val": True}
+
+        def on_close():
+            popup.grab_release()
+            popup.destroy()
+
+        popup.protocol("WM_DELETE_WINDOW", on_close)
+
+        ctk.CTkLabel(popup, text="Enter Sync Key",
+                     font=("Helvetica", 16, "bold"),
+                     text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both", expand=False)
+
+        sync_var = StringVar()
+        sync_entry = ctk.CTkEntry(frame, placeholder_text="Sync Key (base64)",
+                                  textvariable=sync_var, width=360, justify="center")
+        sync_entry.pack(padx=12, pady=(12,6))
+
+        def submit():
+            try:
+                self.salt = urlsafe_b64decode(sync_var.get())
+                closed_by_user["val"] = False
+                popup.grab_release()
+                popup.destroy()
+            except Exception:
+                messagebox.showerror("Error", "Invalid sync key!", parent=popup)
+
+        ctk.CTkButton(frame, text="Submit", command=submit,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,10))
+
+        sync_entry.focus_set()
+        self.wait_window(popup)
+        return not closed_by_user["val"]
+
+    # --- Sync Key display popup ---
+    def _show_sync_key_display_popup(self, sync_key):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+
+        width, height = 480, 280
+        x = (popup.winfo_screenwidth() // 2) - (width // 2)
+        y = (popup.winfo_screenheight() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+
+        def on_close():
+            popup.grab_release()
+            popup.destroy()
+
+        popup.protocol("WM_DELETE_WINDOW", on_close)
+
+        ctk.CTkLabel(popup, text="Your Sync Key",
+                     font=("Helvetica", 16, "bold"),
+                     text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+        ctk.CTkLabel(popup, text="Save this key securely to import on other devices.",
+                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both", expand=False)
+
+        key_var = StringVar(value=sync_key)
+        key_entry = ctk.CTkEntry(frame, textvariable=key_var, width=360, justify="center", state="readonly")
+        key_entry.pack(padx=12, pady=(12,6))
+
+        def copy_key():
+            self.clipboard_clear()
+            self.clipboard_append(sync_key)
+            messagebox.showinfo("Copied", "Sync key copied to clipboard!", parent=popup)
+
+        ctk.CTkButton(frame, text="Copy to Clipboard", command=copy_key,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,10))
+
+        btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
+        btn_frame.pack(pady=(12,12))
+
+        ctk.CTkButton(btn_frame, text="OK", command=on_close,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
+
+        self.wait_window(popup)
+
+    # --- Master Create modal ---
+    def _show_master_create_modal(self):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+
         width, height = 480, 320
         x = (popup.winfo_screenwidth() // 2) - (width // 2)
         y = (popup.winfo_screenheight() // 2) - (height // 2)
@@ -132,14 +338,12 @@ class PasswordManager(ctk.CTk):
 
         popup.protocol("WM_DELETE_WINDOW", on_close)
 
-        # Header
         ctk.CTkLabel(popup, text="Black Hole — Master Password",
                      font=("Helvetica", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
-        ctk.CTkLabel(popup, text="Protect your vault with a master password",
+        ctk.CTkLabel(popup, text="Create a master password for your vault",
                      text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
 
-        # Entry frame
         frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
         frame.pack(padx=20, pady=8, fill="both", expand=False)
 
@@ -148,9 +352,8 @@ class PasswordManager(ctk.CTk):
                                  show="*", textvariable=pwd_var,
                                  width=360, justify="center")
         pwd_entry.pack(padx=12, pady=(12,6))
-        
-        # --- ADDED THIS LINE ---
-        original_entry_color = pwd_entry.cget("fg_color") 
+
+        original_entry_color = pwd_entry.cget("fg_color")
 
         def toggle_pwd():
             pwd_entry.configure(show="" if pwd_entry.cget("show")=="*" else "*")
@@ -159,7 +362,7 @@ class PasswordManager(ctk.CTk):
                        command=toggle_pwd, fg_color=ACCENT, text_color=BG,
                        hover_color=ACCENT_DIM).pack(pady=(0,10))
 
-        # Optional save path
+        # Optional save path for master pw
         path_var = StringVar()
         def browse_path():
             file_path = filedialog.asksaveasfilename(defaultextension=".txt",
@@ -170,50 +373,32 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,8))
         ctk.CTkLabel(frame, textvariable=path_var, text_color=TEXT, fg_color=CARD).pack(pady=(0,8))
 
-        # Buttons
         btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
         btn_frame.pack(pady=(12,12))
 
-        # --- REPLACED THIS FUNCTION ---
-        def mark_wrong(): 
-            # 1. Turn entry red
+        def mark_wrong():
             pwd_entry.configure(fg_color="#7a2d2d")
-
-            # 2. Get original position
             try:
-                # Geometry string is 'widthxheight+x+y'
                 geo_string = popup.geometry()
                 parts = geo_string.split('+')
-                size_part = parts[0] # 'widthxheight'
+                size_part = parts[0]
                 original_x = int(parts[1])
                 original_y = int(parts[2])
             except Exception:
-                # Failsafe if geometry string is weird or window closed
-                pwd_entry.configure(fg_color="#7a2d2d")
-                return 
+                return
 
-            # 3. Define the shake animation
             def shake_animation(step=0):
                 try:
-                    # Movements are offsets from the original_x
-                    offsets = [10, -10, 10, -10, 5, -5, 0] 
-                    
+                    offsets = [10, -10, 10, -10, 5, -5, 0]
                     if step < len(offsets):
                         dx = offsets[step]
-                        # Apply new position
                         popup.geometry(f"{size_part}+{original_x + dx}+{original_y}")
-                        # Schedule next step
                         popup.after(50, shake_animation, step + 1)
-                    
                     elif step == len(offsets):
-                        # After shake is done, wait 1 sec and reset color
                         popup.after(1000, lambda: pwd_entry.configure(fg_color=original_entry_color))
-                
                 except Exception:
-                    # Failsafe in case popup was destroyed during animation
                     pass
 
-            # Start the shake
             shake_animation(0)
 
         def create_master():
@@ -229,6 +414,8 @@ class PasswordManager(ctk.CTk):
                 verif_enc = self.fernet.encrypt(b"VERIFICATION").decode()
                 self.settings["salt"] = urlsafe_b64encode(self.salt).decode()
                 self.settings["verification"] = verif_enc
+                self.settings["db_path"] = self.db_path
+                self.settings["master_password_set"] = True
                 self.master_password = pwd
             except Exception as e:
                 mark_wrong()
@@ -242,15 +429,90 @@ class PasswordManager(ctk.CTk):
                     messagebox.showinfo("Saved", f"Master password saved to {save_path}", parent=popup)
                 except Exception as e:
                     messagebox.showwarning("Warning", f"Couldn't save: {e}", parent=popup)
-            self.settings["master_password_set"] = True
-            try:
-                with open(settings_path,"w",encoding="utf-8") as sf:
-                    json.dump(self.settings,sf)
-            except Exception:
-                pass
             closed_by_user["val"] = False
             popup.grab_release()
             popup.destroy()
+
+        ctk.CTkButton(btn_frame, text="Create & Continue", command=create_master,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
+        ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
+
+        pwd_entry.focus_set()
+        self.wait_window(popup)
+        return not closed_by_user["val"] and self.fernet is not None
+
+    # --- Master Unlock modal ---
+    def _show_master_unlock_modal(self):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+
+        width, height = 480, 320
+        x = (popup.winfo_screenwidth() // 2) - (width // 2)
+        y = (popup.winfo_screenheight() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+
+        closed_by_user = {"val": True}
+
+        def on_close():
+            popup.grab_release()
+            popup.destroy()
+
+        popup.protocol("WM_DELETE_WINDOW", on_close)
+
+        ctk.CTkLabel(popup, text="Black Hole — Master Password",
+                     font=("Helvetica", 16, "bold"),
+                     text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+        ctk.CTkLabel(popup, text="Enter your master password to unlock",
+                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both", expand=False)
+
+        pwd_var = StringVar()
+        pwd_entry = ctk.CTkEntry(frame, placeholder_text="Master Password",
+                                 show="*", textvariable=pwd_var,
+                                 width=360, justify="center")
+        pwd_entry.pack(padx=12, pady=(12,6))
+
+        original_entry_color = pwd_entry.cget("fg_color")
+
+        def toggle_pwd():
+            pwd_entry.configure(show="" if pwd_entry.cget("show")=="*" else "*")
+
+        ctk.CTkButton(frame, text="Show/Hide", width=120,
+                       command=toggle_pwd, fg_color=ACCENT, text_color=BG,
+                       hover_color=ACCENT_DIM).pack(pady=(0,10))
+
+        btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
+        btn_frame.pack(pady=(12,12))
+
+        def mark_wrong():
+            pwd_entry.configure(fg_color="#7a2d2d")
+            try:
+                geo_string = popup.geometry()
+                parts = geo_string.split('+')
+                size_part = parts[0]
+                original_x = int(parts[1])
+                original_y = int(parts[2])
+            except Exception:
+                return
+
+            def shake_animation(step=0):
+                try:
+                    offsets = [10, -10, 10, -10, 5, -5, 0]
+                    if step < len(offsets):
+                        dx = offsets[step]
+                        popup.geometry(f"{size_part}+{original_x + dx}+{original_y}")
+                        popup.after(50, shake_animation, step + 1)
+                    elif step == len(offsets):
+                        popup.after(1000, lambda: pwd_entry.configure(fg_color=original_entry_color))
+                except Exception:
+                    pass
+
+            shake_animation(0)
 
         def unlock_master():
             pwd = pwd_var.get() or ""
@@ -261,29 +523,48 @@ class PasswordManager(ctk.CTk):
             try:
                 key = derive_key(pwd, self.salt)
                 fernet_test = Fernet(key)
-                verif_dec = fernet_test.decrypt(self.settings["verification"].encode()).decode()
-                if verif_dec != "VERIFICATION":
-                    raise ValueError("Verification failed")
+                # For import, no verification yet, so skip or assume
+                # For normal unlock, check verification
+                if "verification" in self.settings:
+                    verif_dec = fernet_test.decrypt(self.settings["verification"].encode()).decode()
+                    if verif_dec != "VERIFICATION":
+                        raise ValueError("Verification failed")
                 self.fernet = fernet_test
                 self.master_password = pwd
                 closed_by_user["val"] = False
                 popup.grab_release()
                 popup.destroy()
-            except Exception:
+            except Exception as e:
                 mark_wrong()
                 messagebox.showerror("Error", "Incorrect master password!", parent=popup)
 
-        if not self.settings.get("master_password_set", False):
-            ctk.CTkButton(btn_frame, text="Create & Continue", command=create_master,
-                           fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
-        else:
-            ctk.CTkButton(btn_frame, text="Unlock", command=unlock_master,
-                           fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
-        ctk.CTkButton(btn_frame, text="Exit", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
+        ctk.CTkButton(btn_frame, text="Unlock", command=unlock_master,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
+        ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
 
         pwd_entry.focus_set()
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
+
+    # --- Auth modal for normal unlock ---
+    def _show_master_password_modal(self):
+        # This is for normal unlock after setup
+        return self._show_master_unlock_modal()
+
+    # --- Initialize DB ---
+    def _init_db(self):
+        self.conn = sqlite3.connect(self.db_path)
+        self.c = self.conn.cursor()
+        self.c.execute('''
+            CREATE TABLE IF NOT EXISTS passwords (
+                id INTEGER PRIMARY KEY,
+                title TEXT,
+                username TEXT,
+                password TEXT,
+                notes TEXT
+            )
+        ''')
+        self.conn.commit()
 
     # --- Build UI ---
     def _build_ui(self):
@@ -308,7 +589,7 @@ class PasswordManager(ctk.CTk):
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
 
-        for row in c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY id DESC"):
+        for row in self.c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY id DESC"):
             id_, title, user, pwd_enc, notes = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
@@ -363,8 +644,8 @@ class PasswordManager(ctk.CTk):
             if not title:
                 messagebox.showerror("Error", "Title required!", parent=popup)
                 return
-            c.execute("INSERT INTO passwords (title, username, password, notes) VALUES (?, ?, ?, ?)", (title, "", "", ""))
-            conn.commit()
+            self.c.execute("INSERT INTO passwords (title, username, password, notes) VALUES (?, ?, ?, ?)", (title, "", "", ""))
+            self.conn.commit()
             popup.grab_release()
             popup.destroy()
             self.load_cards()
@@ -374,7 +655,7 @@ class PasswordManager(ctk.CTk):
 
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
-        row = c.execute("SELECT title, username, password, notes FROM passwords WHERE id=?", (id_,)).fetchone()
+        row = self.c.execute("SELECT title, username, password, notes FROM passwords WHERE id=?", (id_,)).fetchone()
         if not row:
             messagebox.showerror("Error", "Entry not found.")
             return
@@ -414,9 +695,9 @@ class PasswordManager(ctk.CTk):
 
         def save_card():
             enc_pwd = self.fernet.encrypt(pwd_var.get().encode()).decode() if pwd_var.get() else ""
-            c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=? WHERE id=?",
+            self.c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=? WHERE id=?",
                       (title_var.get(), user_var.get(), enc_pwd, notes_var.get(), id_))
-            conn.commit()
+            self.conn.commit()
             popup.grab_release()
             popup.destroy()
             self.load_cards()
@@ -426,14 +707,14 @@ class PasswordManager(ctk.CTk):
     # --- Delete ---
     def delete_card(self, id_):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
-            c.execute("DELETE FROM passwords WHERE id=?", (id_,))
-            conn.commit()
+            self.c.execute("DELETE FROM passwords WHERE id=?", (id_,))
+            self.conn.commit()
             self.load_cards()
 
     # --- Export ---
     def export_docx(self):
         doc = Document()
-        for row in c.execute("SELECT title, username, password, notes FROM passwords"):
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
             title, user, pwd_enc, notes = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
@@ -451,7 +732,7 @@ class PasswordManager(ctk.CTk):
 
     def export_odt(self):
         odt = OpenDocumentText()
-        for row in c.execute("SELECT title, username, password, notes FROM passwords"):
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
             title, user, pwd_enc, notes = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
