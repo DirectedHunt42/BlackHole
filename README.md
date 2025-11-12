@@ -39,7 +39,7 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 - 🧠 **Master Password System** — Set and manage one key to access your vault.  
 - 💾 **Secure Database** — Uses a local database for encrypted storage.
 
-[![Flag Counter](https://s01.flagcounter.com/count2/TWw2/bg_0D1117/txt_FFFFFF/border_0D1117/columns_8/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/)](https://info.flagcounter.com/CNIc)
+[![Flag Counter](https://s01.flagcounter.com/count2/TWw2/bg_0D1117/txt_FFFFFF/border_0D1117/columns_8/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/)](https://info.flagcounter.com/TWw2)
 
 ### Support
 [Buy me a coffee](https://buymeacoffee.com/novafoundry)
