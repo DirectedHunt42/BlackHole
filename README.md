@@ -20,7 +20,7 @@
 
 ![Commits](https://img.shields.io/github/commit-activity/m/DirectedHunt42/BlackHole?color=blue)
 ![Issues](https://img.shields.io/github/issues/DirectedHunt42/BlackHole)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-CC%20BY--ND%204.0-purple)
 ![Releases](https://img.shields.io/github/v/release/DirectedHunt42/BlackHole?color=red)
 
 ![Forks](https://img.shields.io/github/forks/DirectedHunt42/BlackHole)
