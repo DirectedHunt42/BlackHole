@@ -3,3 +3,4 @@ cryptography
 python-docx
 odfpy
 pyperclip
+pillow

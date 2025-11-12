@@ -12,9 +12,13 @@ from tkinter import messagebox, StringVar, filedialog
 from docx import Document
 from odf.opendocument import OpenDocumentText
 from odf.text import P
+from PIL import Image, ImageTk
 
 # --- App Icon ---
-APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"  # <-- change to your .ico path
+APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
+BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
+NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
+LICENSE_TEXT = r"LICENSE.txt"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -594,6 +598,7 @@ class PasswordManager(ctk.CTk):
         btn_frame.pack(pady=(0,12))
         ctk.CTkButton(btn_frame, text="Create New", command=self.create_new_card,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
+        ctk.CTkButton(btn_frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
         ctk.CTkButton(btn_frame, text="Export DOCX", command=self.export_docx, fg_color="#2f3b4a").pack(side="left", padx=8)
         ctk.CTkButton(btn_frame, text="Export ODT", command=self.export_odt, fg_color="#2f3b4a").pack(side="left", padx=8)
 
@@ -772,6 +777,72 @@ class PasswordManager(ctk.CTk):
         if path:
             odt.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
+
+    #--- About Popup ---
+    def show_about(self):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.title("About Black Hole")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
+
+        pil_image_bh = Image.open(BLACK_HOLE_LOGO)
+        bh_width, bh_height = pil_image_bh.size
+        new_width_bh = 200
+        new_height_bh = int((new_width_bh / bh_width) * bh_height)
+        bh_ctk_image = ctk.CTkImage(
+            light_image=pil_image_bh,
+            dark_image=pil_image_bh,
+            size=(new_width_bh, new_height_bh) 
+        )
+        bh_label = ctk.CTkLabel(popup, image=bh_ctk_image, text="")
+        bh_label.pack(pady=(12, 6))
+
+        pil_image_nf = Image.open(NOVA_FOUNDRY_LOGO)
+        nf_width, nf_height = pil_image_nf.size
+        new_width_nf = 100
+        new_height_nf = int((new_width_nf / nf_width) * nf_height)
+        nf_ctk_image = ctk.CTkImage(
+            light_image=pil_image_nf,
+            dark_image=pil_image_nf,
+            size=(new_width_nf, new_height_nf)
+        )
+        nf_label = ctk.CTkLabel(popup, image=nf_ctk_image, text="")
+        nf_label.pack(pady=(0, 12))
+
+        ctk.CTkLabel(popup, text="Black Hole Password Manager", font=("Helvetica", 16, "bold"),
+                    text_color=TEXT, fg_color=BG).pack(pady=(12, 6))
+        ctk.CTkLabel(popup, text="Version 1.0.0\n\n",
+                    text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0, 12))
+
+        try:
+            with open(LICENSE_TEXT, 'r', encoding='utf-8') as f:
+                license_content = f.read()
+        except Exception as e:
+            print(f"Error loading license file: {e}")
+            license_content = "Could not load license information."
+        
+        license_box = ctk.CTkTextbox(popup, 
+                                    width=480,
+                                    height=250,
+                                    text_color=TEXT,
+                                    fg_color=BG,
+                                    wrap="word")
+        
+        license_box.insert("1.0", license_content)
+        license_box.configure(state="disabled")
+        license_box.pack(padx=20, pady=(0, 12))
+
+        ctk.CTkButton(popup, text="OK", command=lambda: (popup.grab_release(), popup.destroy()),
+                    fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0, 12))
+
+        center_popup(popup)
+        self.wait_window(popup)
 
 # --- Run App ---
 if __name__ == "__main__":
