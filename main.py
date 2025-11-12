@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import json
+import threading
 import customtkinter as ctk
 import sqlite3
 from cryptography.fernet import Fernet
@@ -14,12 +15,14 @@ from docx import Document
 from odf.opendocument import OpenDocumentText
 from odf.text import P
 from PIL import Image, ImageTk
+import urllib
 
 # --- App Icon ---
 APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 LICENSE_TEXT = r"LICENSE.txt"
+VERSION = "1.0.0"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -842,7 +845,7 @@ class PasswordManager(ctk.CTk):
 
         ctk.CTkLabel(popup, text="Black Hole Password Manager", font=("Helvetica", 16, "bold"),
                     text_color=TEXT, fg_color=BG).pack(pady=(12, 6))
-        ctk.CTkLabel(popup, text="Version 1.0.0\n\n",
+        ctk.CTkLabel(popup, text=f"Version {VERSION}\n\n",
                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0, 12))
 
         try:
@@ -868,6 +871,71 @@ class PasswordManager(ctk.CTk):
 
         center_popup(popup)
         self.wait_window(popup)
+
+
+    def check_for_update():
+        def check_task():
+            try:
+                url = "https://api.github.com/repos/DirectedHunt42/BlackHole/releases/latest"
+                req = urllib.request.Request(url, headers={'User-Agent': 'EchoHub', 'Accept': 'application/vnd.github.v3+json'})
+                with urllib.request.urlopen(req) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                app.after(0, lambda d=data: do_update_confirm(d))
+            except:
+                pass
+        threading.Thread(target=check_task, daemon=True).start()
+
+        def do_update_confirm(data):
+            try:
+                title = data.get('name', '')
+                if title.startswith("Release "):
+                    new_ver = title[len("Release "):].strip()
+                else:
+                    return
+                current_ver = VERSION
+                def version_to_tuple(v):
+                    return tuple(map(int, (v.split("."))))
+                if version_to_tuple(new_ver) > version_to_tuple(current_ver):
+                    if messagebox.askyesno("Update Available", f"A new version ({new_ver}) is available. Do you want to download and install it?"):
+                        download_and_install(data)
+            except:
+                pass
+
+        def download_and_install(data):
+            progress_popup = ctk.CTkToplevel(app)
+            progress_popup.grab_set()
+            progress_popup.title("Downloading Update")
+            progress_popup.configure(fg_color=BG)
+            progress_popup.resizable(False, False)
+            if os.path.exists(APP_ICON_PATH):
+                try:
+                    progress_popup.iconbitmap(APP_ICON_PATH)
+                except Exception:
+                    pass
+            ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
+            center_popup(progress_popup)
+            download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
+            download_bar.pack(pady=(0,12))
+            progress_popup.update()
+            try:
+                assets = data.get('assets', [])
+                download_url = None
+                for asset in assets:
+                    if asset.get('name','').endswith('.exe'):
+                        download_url = asset.get('browser_download_url', None)
+                        break
+                if not download_url:
+                    return
+                temp_path = os.path.join(os.getenv("TEMP") or ".", "BlackHole_Update.exe")
+                req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
+                with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
+                    shutil.copyfileobj(response, out_file)
+                    download_bar.stop()
+                progress_popup.destroy()
+                os.startfile(temp_path)
+                app.quit()
+            except:
+                pass
 
 # --- Run App ---
 if __name__ == "__main__":
