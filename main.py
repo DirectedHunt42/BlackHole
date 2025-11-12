@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from base64 import urlsafe_b64encode
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 from tkinter import messagebox, StringVar, filedialog
 from docx import Document
 from odf.opendocument import OpenDocumentText
@@ -85,7 +85,7 @@ class PasswordManager(ctk.CTk):
         # encryption / state
         self.master_password = None
         self.fernet = None
-        self.salt = b"blackhole_salt"
+        self.salt = None
 
         # load settings
         self.settings = {"master_password_set": False}
@@ -93,6 +93,8 @@ class PasswordManager(ctk.CTk):
             try:
                 with open(settings_path, "r") as f:
                     self.settings = json.load(f)
+                if "salt" in self.settings:
+                    self.salt = urlsafe_b64decode(self.settings["salt"])
             except Exception:
                 self.settings = {"master_password_set": False}
 
@@ -221,7 +223,12 @@ class PasswordManager(ctk.CTk):
                 messagebox.showerror("Error", "Master password required!", parent=popup)
                 return
             try:
-                self.fernet = Fernet(derive_key(pwd, self.salt))
+                self.salt = os.urandom(16)
+                key = derive_key(pwd, self.salt)
+                self.fernet = Fernet(key)
+                verif_enc = self.fernet.encrypt(b"VERIFICATION").decode()
+                self.settings["salt"] = urlsafe_b64encode(self.salt).decode()
+                self.settings["verification"] = verif_enc
                 self.master_password = pwd
             except Exception as e:
                 mark_wrong()
@@ -252,10 +259,11 @@ class PasswordManager(ctk.CTk):
                 messagebox.showerror("Error", "Master password required!", parent=popup)
                 return
             try:
-                fernet_test = Fernet(derive_key(pwd,self.salt))
-                row = c.execute("SELECT password FROM passwords WHERE password IS NOT NULL LIMIT 1").fetchone()
-                if row and row[0]:
-                    fernet_test.decrypt(row[0].encode())
+                key = derive_key(pwd, self.salt)
+                fernet_test = Fernet(key)
+                verif_dec = fernet_test.decrypt(self.settings["verification"].encode()).decode()
+                if verif_dec != "VERIFICATION":
+                    raise ValueError("Verification failed")
                 self.fernet = fernet_test
                 self.master_password = pwd
                 closed_by_user["val"] = False
