@@ -1,0 +1,50 @@
+<p align="center">
+  <picture>
+    <!-- Light mode logo -->
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/DirectedHunt42/BlackHole/blob/main/Icons/BlackHole_Transparent_Light.png">
+    <!-- Dark mode logo -->
+    <source media="(prefers-color-scheme: light)" srcset="https://github.com/DirectedHunt42/BlackHole/blob/main/Icons/BlackHole_Transparent.png">
+    <img src="https://github.com/DirectedHunt42/BlackHole/blob/main/Assets/Logos/blackhole_light.png" alt="Black Hole Logo" width="350"/>
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="https://github.com/DirectedHunt42/BlackHole/blob/main/Icons/Nova_foundry_wide_transparent_dark.png">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/DirectedHunt42/BlackHole/blob/main/Icons/Nova_foundry_wide_transparent.png">
+    <img src="https://github.com/DirectedHunt42/BlackHole/blob/main/Assets/Logos/nova_foundry_light.png" alt="Nova Foundry Logo" width="100"/>
+  </picture>
+</p>
+
+<div align="center">
+
+![Commits](https://img.shields.io/github/commit-activity/m/DirectedHunt42/BlackHole?color=blue)
+![Issues](https://img.shields.io/github/issues/DirectedHunt42/BlackHole)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Releases](https://img.shields.io/github/v/release/DirectedHunt42/BlackHole?color=red)
+
+![Forks](https://img.shields.io/github/forks/DirectedHunt42/BlackHole)
+![Stars](https://img.shields.io/github/stars/DirectedHunt42/BlackHole)
+
+</div>
+
+## Black Hole
+
+**Black Hole** is a lightweight, secure, and offline-first password manager built with simplicity and privacy in mind.  
+Your passwords are stored locally, encrypted, and protected by a single master password — **nothing ever leaves your system**.
+
+### Features
+
+- 🔐 **Local-Only Encryption** — All passwords are encrypted with your master password and stored on your device.  
+- 🧠 **Master Password System** — Set and manage one key to access your vault.  
+- 📁 **Automatic Save Path** — Data is saved in your AppData/Local `NovaFoundry/BlackHole` directory for security and portability.  
+- 💾 **Secure Database** — Uses a local JSON database for encrypted storage.  
+- 🧭 **Simple UI** — Built with CustomTkinter for a modern, minimal desktop experience.
+
+### Support
+[Buy me a coffee](https://buymeacoffee.com/novafoundry)
+
+### License
+This project is licensed under the MIT License — see the LICENSE
+ file for details.
+© Nova Foundry 2025
