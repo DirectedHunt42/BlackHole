@@ -146,6 +146,9 @@ class PasswordManager(ctk.CTk):
                                  show="*", textvariable=pwd_var,
                                  width=360, justify="center")
         pwd_entry.pack(padx=12, pady=(12,6))
+        
+        # --- ADDED THIS LINE ---
+        original_entry_color = pwd_entry.cget("fg_color") 
 
         def toggle_pwd():
             pwd_entry.configure(show="" if pwd_entry.cget("show")=="*" else "*")
@@ -169,8 +172,47 @@ class PasswordManager(ctk.CTk):
         btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
         btn_frame.pack(pady=(12,12))
 
+        # --- REPLACED THIS FUNCTION ---
         def mark_wrong(): 
-            pwd_entry.configure(fg_color="#7a2d2d")  # red background
+            # 1. Turn entry red
+            pwd_entry.configure(fg_color="#7a2d2d")
+
+            # 2. Get original position
+            try:
+                # Geometry string is 'widthxheight+x+y'
+                geo_string = popup.geometry()
+                parts = geo_string.split('+')
+                size_part = parts[0] # 'widthxheight'
+                original_x = int(parts[1])
+                original_y = int(parts[2])
+            except Exception:
+                # Failsafe if geometry string is weird or window closed
+                pwd_entry.configure(fg_color="#7a2d2d")
+                return 
+
+            # 3. Define the shake animation
+            def shake_animation(step=0):
+                try:
+                    # Movements are offsets from the original_x
+                    offsets = [10, -10, 10, -10, 5, -5, 0] 
+                    
+                    if step < len(offsets):
+                        dx = offsets[step]
+                        # Apply new position
+                        popup.geometry(f"{size_part}+{original_x + dx}+{original_y}")
+                        # Schedule next step
+                        popup.after(50, shake_animation, step + 1)
+                    
+                    elif step == len(offsets):
+                        # After shake is done, wait 1 sec and reset color
+                        popup.after(1000, lambda: pwd_entry.configure(fg_color=original_entry_color))
+                
+                except Exception:
+                    # Failsafe in case popup was destroyed during animation
+                    pass
+
+            # Start the shake
+            shake_animation(0)
 
         def create_master():
             pwd = pwd_var.get() or ""
