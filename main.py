@@ -73,7 +73,6 @@ class PasswordManager(ctk.CTk):
             pass
 
         # Hide main window until auth succeeds
-        self.withdraw()
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
         if os.path.exists(APP_ICON_PATH):
@@ -81,6 +80,7 @@ class PasswordManager(ctk.CTk):
                 self.iconbitmap(APP_ICON_PATH)
             except Exception:
                 pass
+        self.attributes('-alpha', 0.0)
 
         # encryption / state
         self.master_password = None
@@ -107,7 +107,7 @@ class PasswordManager(ctk.CTk):
         # Build UI after successful auth
         self.configure(fg_color=BG)
         self._build_ui()
-        self.deiconify()
+        self.attributes('-alpha', 1.0)
         self.load_cards()
 
     # --- Auth modal ---
