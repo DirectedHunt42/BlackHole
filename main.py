@@ -28,6 +28,8 @@ VERSION = "1.0.0"
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
 nova_folder = os.path.join(local_appdata, "NovaFoundry")
 os.makedirs(nova_folder, exist_ok=True)
+stored_icons_path = os.path.join(nova_folder, "StoredIcons")
+os.makedirs(stored_icons_path, exist_ok=True)
 
 settings_path = os.path.join(nova_folder, "settings.json")
 
@@ -118,6 +120,7 @@ class PasswordManager(ctk.CTk):
         self.attributes('-alpha', 1.0)
         self.wm_state('zoomed')
         self.load_cards()
+        self.check_for_update()
 
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
@@ -572,6 +575,110 @@ class PasswordManager(ctk.CTk):
         # This is for normal unlock after setup
         return self._show_master_unlock_modal()
 
+    def _verify_master_password(self):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
+
+        verified = False
+        closed_by_user = {"val": True}
+
+        def on_close():
+            popup.grab_release()
+            popup.destroy()
+
+        popup.protocol("WM_DELETE_WINDOW", on_close)
+
+        ctk.CTkLabel(popup, text="Verify Master Password",
+                     font=("Helvetica", 16, "bold"),
+                     text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+        ctk.CTkLabel(popup, text="Enter your master password to proceed",
+                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both", expand=False)
+
+        pwd_var = StringVar()
+        pwd_entry = ctk.CTkEntry(frame, placeholder_text="Master Password",
+                                 show="*", textvariable=pwd_var,
+                                 width=360, justify="center")
+        pwd_entry.pack(padx=12, pady=(12,6))
+
+        original_entry_color = pwd_entry.cget("fg_color")
+
+        def toggle_pwd():
+            pwd_entry.configure(show="" if pwd_entry.cget("show")=="*" else "*")
+
+        ctk.CTkButton(frame, text="Show/Hide", width=120,
+                       command=toggle_pwd, fg_color=ACCENT, text_color=BG,
+                       hover_color=ACCENT_DIM).pack(pady=(0,10))
+
+        btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
+        btn_frame.pack(pady=(12,12))
+
+        def mark_wrong():
+            pwd_entry.configure(fg_color="#7a2d2d")
+            try:
+                geo_string = popup.geometry()
+                parts = geo_string.split('+')
+                size_part = parts[0]
+                original_x = int(parts[1])
+                original_y = int(parts[2])
+            except Exception:
+                return
+
+            def shake_animation(step=0):
+                try:
+                    offsets = [10, -10, 10, -10, 5, -5, 0]
+                    if step < len(offsets):
+                        dx = offsets[step]
+                        popup.geometry(f"{size_part}+{original_x + dx}+{original_y}")
+                        popup.after(50, shake_animation, step + 1)
+                    elif step == len(offsets):
+                        popup.after(1000, lambda: pwd_entry.configure(fg_color=original_entry_color))
+                except Exception:
+                    pass
+
+            shake_animation(0)
+
+        def verify_master():
+            nonlocal verified
+            pwd = pwd_var.get() or ""
+            if not pwd:
+                mark_wrong()
+                messagebox.showerror("Error", "Master password required!", parent=popup)
+                return
+            try:
+                key = derive_key(pwd, self.salt)
+                fernet_test = Fernet(key)
+                if "verification" in self.settings:
+                    verif_dec = fernet_test.decrypt(self.settings["verification"].encode()).decode()
+                    if verif_dec != "VERIFICATION":
+                        raise ValueError("Verification failed")
+                verified = True
+                closed_by_user["val"] = False
+                popup.grab_release()
+                popup.destroy()
+            except Exception as e:
+                mark_wrong()
+                messagebox.showerror("Error", "Incorrect master password!", parent=popup)
+
+        ctk.CTkButton(btn_frame, text="Verify", command=verify_master,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
+        ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
+
+        pwd_entry.focus_set()
+        center_popup(popup)
+        self.wait_window(popup)
+        return not closed_by_user["val"] and verified
+
     # --- Initialize DB ---
     def _init_db(self):
         self.conn = sqlite3.connect(self.db_path)
@@ -585,6 +692,11 @@ class PasswordManager(ctk.CTk):
                 notes TEXT
             )
         ''')
+        try:
+            self.c.execute("ALTER TABLE passwords ADD COLUMN icon_path TEXT")
+        except sqlite3.OperationalError as e:
+            if "duplicate column" not in str(e).lower():
+                raise
         self.conn.commit()
 
     # --- Build UI ---
@@ -594,8 +706,9 @@ class PasswordManager(ctk.CTk):
         ctk.CTkLabel(header, text="Black Hole Vault", font=("Helvetica", 18, "bold"),
                      text_color=TEXT, fg_color=BG).pack(side="left", padx=(6,12))
 
-        self.cards_frame = ctk.CTkScrollableFrame(self, width=860, height=420, fg_color=BG, corner_radius=10)
+        self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
+        self.cards_frame.grid_columnconfigure((0,1,2,3,4), weight=1)  # 5 columns for example
 
         btn_frame = ctk.CTkFrame(self, fg_color=BG)
         btn_frame.pack(pady=(0,12))
@@ -603,21 +716,28 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
         ctk.CTkButton(btn_frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
         ctk.CTkButton(btn_frame, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
+        ctk.CTkButton(btn_frame, text="Reset", command=self.reset_app, fg_color="#7a2d2d", text_color=BG, hover_color="#5a1d1d").pack(side="left", padx=8)
 
     # --- Load Cards ---
     def load_cards(self):
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
 
-        for row in self.c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY id DESC"):
-            id_, title, user, pwd_enc, notes = row
+        rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC").fetchall()
+
+        num_columns = 5  # Adjust based on preference
+
+        for i, row in enumerate(rows):
+            id_, title, user, pwd_enc, notes, icon_path = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
             except Exception:
                 pwd = ""
 
-            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=10)
-            card.pack(pady=8, padx=12, fill="x")
+            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=10, width=200, height=250)
+            row_num = i // num_columns
+            col = i % num_columns
+            card.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
             def on_enter(e, f=card):
                 f.configure(fg_color=CARD_HOVER)
@@ -626,26 +746,53 @@ class PasswordManager(ctk.CTk):
             card.bind("<Enter>", on_enter)
             card.bind("<Leave>", on_leave)
 
-            left = ctk.CTkFrame(card, fg_color=CARD, corner_radius=0)
-            left.pack(side="left", fill="both", expand=True, padx=8, pady=8)
-            ctk.CTkLabel(left, text=title or "(No title)", anchor="w",
-                         font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=CARD).pack(anchor="w")
-            ctk.CTkLabel(left, text=f"Username: {user or ''}", anchor="w",
-                         text_color=ACCENT_DIM, fg_color=CARD).pack(anchor="w", pady=(4,0))
+            image_frame = ctk.CTkFrame(card, height=200, fg_color="transparent")
+            image_frame.pack(fill="x", expand=False)
+            if icon_path and os.path.exists(icon_path):
+                try:
+                    pil_img = Image.open(icon_path)
+                    pil_img = pil_img.resize((200, 200), Image.LANCZOS)
+                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(200, 200))
+                    image_label = ctk.CTkLabel(image_frame, image=ctk_img, text="")
+                    image_label.pack(expand=True, fill="both")
+                except:
+                    pass
+
+            bottom_frame = ctk.CTkFrame(card, height=50, fg_color=CARD)
+            bottom_frame.pack(fill="x", expand=True)
+
+            left = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
+            left.pack(side="left", fill="both", expand=True, padx=4, pady=4)
+            title_label = ctk.CTkLabel(left, text=title or "(No title)", anchor="w",
+                         font=("Helvetica", 10, "bold"), text_color=TEXT, fg_color=CARD)
+            title_label.pack(anchor="w")
+            user_label = ctk.CTkLabel(left, text=f"User: {user or ''}", anchor="w",
+                         text_color=ACCENT_DIM, fg_color=CARD, font=("Helvetica", 8))
+            user_label.pack(anchor="w")
 
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
-            ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD).pack(anchor="w", pady=(8,0))
+            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Helvetica", 8))
+            pwd_label.pack(anchor="w")
 
-            right = ctk.CTkFrame(card, fg_color=CARD, corner_radius=0)
-            right.pack(side="right", padx=10, pady=8)
+            def copy_text(text, msg="Copied to clipboard!"):
+                if text:
+                    self.clipboard_clear()
+                    self.clipboard_append(text)
+                    messagebox.showinfo("Copied", msg)
+
+            user_label.bind("<Button-1>", lambda e, u=user: copy_text(u, "Username copied!"))
+            pwd_label.bind("<Button-1>", lambda e, p=pwd: copy_text(p, "Password copied!"))
+
+            right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
+            right.pack(side="right", padx=4, pady=4)
 
             def toggle_show(pw=pwd, var=pwd_var):
                 var.set(pw if var.get().startswith("*") else "*"*len(pw))
             ctk.CTkButton(right, text="Show", command=toggle_show,
-                           width=72, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=4)
-            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=72).pack(pady=4)
-            ctk.CTkButton(right, text="Delete", command=lambda id=id_: self.delete_card(id), width=72,
-                           fg_color="#7a2d2d").pack(pady=4)
+                           width=60, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, font=("Helvetica", 8)).pack(pady=2)
+            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Helvetica", 8)).pack(pady=2)
+            ctk.CTkButton(right, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
+                           fg_color="#7a2d2d", font=("Helvetica", 8)).pack(pady=2)
 
     # --- Create Card ---
     def create_new_card(self):
@@ -669,7 +816,7 @@ class PasswordManager(ctk.CTk):
             if not title:
                 messagebox.showerror("Error", "Title required!", parent=popup)
                 return
-            self.c.execute("INSERT INTO passwords (title, username, password, notes) VALUES (?, ?, ?, ?)", (title, "", "", ""))
+            self.c.execute("INSERT INTO passwords (title, username, password, notes, icon_path) VALUES (?, ?, ?, ?, ?)", (title, "", "", "", ""))
             self.conn.commit()
             popup.grab_release()
             popup.destroy()
@@ -682,11 +829,11 @@ class PasswordManager(ctk.CTk):
 
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
-        row = self.c.execute("SELECT title, username, password, notes FROM passwords WHERE id=?", (id_,)).fetchone()
+        row = self.c.execute("SELECT title, username, password, notes, icon_path FROM passwords WHERE id=?", (id_,)).fetchone()
         if not row:
             messagebox.showerror("Error", "Entry not found.")
             return
-        title, user, pwd_enc, notes = row
+        title, user, pwd_enc, notes, current_icon_path = row
         try:
             pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
         except Exception:
@@ -725,10 +872,30 @@ class PasswordManager(ctk.CTk):
         notes_var = StringVar(value=notes)
         ctk.CTkEntry(popup, textvariable=notes_var, width=420).pack(padx=20, pady=(4,12))
 
+        ctk.CTkLabel(popup, text="Icon", text_color=ACCENT_DIM, fg_color=BG).pack(anchor="w", padx=20)
+        new_icon_path = None
+        def upload_icon():
+            nonlocal new_icon_path
+            file = filedialog.askopenfilename(filetypes=[("Images", "*.png *.jpg *.jpeg *.ico")])
+            if file:
+                ext = os.path.splitext(file)[1]
+                dest = os.path.join(stored_icons_path, f"{id_}{ext}")
+                shutil.copy(file, dest)
+                new_icon_path = dest
+                messagebox.showinfo("Uploaded", "Icon uploaded!", parent=popup)
+
+        ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
+
         def save_card():
             enc_pwd = self.fernet.encrypt(pwd_var.get().encode()).decode() if pwd_var.get() else ""
-            self.c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=? WHERE id=?",
-                      (title_var.get(), user_var.get(), enc_pwd, notes_var.get(), id_))
+            icon_to_save = new_icon_path if new_icon_path else current_icon_path
+            if new_icon_path and current_icon_path and os.path.exists(current_icon_path):
+                try:
+                    os.remove(current_icon_path)
+                except:
+                    pass
+            self.c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=?, icon_path=? WHERE id=?",
+                           (title_var.get(), user_var.get(), enc_pwd, notes_var.get(), icon_to_save or "", id_))
             self.conn.commit()
             popup.grab_release()
             popup.destroy()
@@ -741,6 +908,12 @@ class PasswordManager(ctk.CTk):
     # --- Delete ---
     def delete_card(self, id_):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
+            row = self.c.execute("SELECT icon_path FROM passwords WHERE id=?", (id_,)).fetchone()
+            if row and row[0] and os.path.exists(row[0]):
+                try:
+                    os.remove(row[0])
+                except:
+                    pass
             self.c.execute("DELETE FROM passwords WHERE id=?", (id_,))
             self.conn.commit()
             self.load_cards()
@@ -773,6 +946,8 @@ class PasswordManager(ctk.CTk):
         self.wait_window(popup)
 
     def export_docx(self):
+        if not self._verify_master_password():
+            return
         doc = Document()
         for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
             title, user, pwd_enc, notes = row
@@ -791,6 +966,8 @@ class PasswordManager(ctk.CTk):
             messagebox.showinfo("Exported", f"Exported to {path}")
 
     def export_odt(self):
+        if not self._verify_master_password():
+            return
         odt = OpenDocumentText()
         for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
             title, user, pwd_enc, notes = row
@@ -872,15 +1049,25 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
         self.wait_window(popup)
 
+    def reset_app(self):
+        if not messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the app? This will delete settings and stored icons, but not the database."):
+            return
+        if not self._verify_master_password():
+            return
+        self.conn.close()
+        shutil.rmtree(nova_folder)
+        messagebox.showinfo("Reset Complete", "App reset. Restart the application.")
+        self.destroy()
+        sys.exit()
 
-    def check_for_update():
+    def check_for_update(self):
         def check_task():
             try:
                 url = "https://api.github.com/repos/DirectedHunt42/BlackHole/releases/latest"
                 req = urllib.request.Request(url, headers={'User-Agent': 'EchoHub', 'Accept': 'application/vnd.github.v3+json'})
                 with urllib.request.urlopen(req) as response:
                     data = json.loads(response.read().decode('utf-8'))
-                app.after(0, lambda d=data: do_update_confirm(d))
+                self.after(0, lambda d=data: do_update_confirm(d))
             except:
                 pass
         threading.Thread(target=check_task, daemon=True).start()
@@ -902,7 +1089,7 @@ class PasswordManager(ctk.CTk):
                 pass
 
         def download_and_install(data):
-            progress_popup = ctk.CTkToplevel(app)
+            progress_popup = ctk.CTkToplevel(self)
             progress_popup.grab_set()
             progress_popup.title("Downloading Update")
             progress_popup.configure(fg_color=BG)
@@ -916,26 +1103,29 @@ class PasswordManager(ctk.CTk):
             center_popup(progress_popup)
             download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
             download_bar.pack(pady=(0,12))
+            download_bar.start()
             progress_popup.update()
             try:
                 assets = data.get('assets', [])
                 download_url = None
                 for asset in assets:
-                    if asset.get('name','').endswith('.exe'):
+                    if asset.get('name','') == 'Black_hole_setup.exe':
                         download_url = asset.get('browser_download_url', None)
                         break
                 if not download_url:
-                    return
-                temp_path = os.path.join(os.getenv("TEMP") or ".", "BlackHole_Update.exe")
+                    raise Exception("No matching asset found")
+                temp_path = os.path.join(os.getenv("TEMP") or ".", "Black_hole_setup.exe")
                 req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
                 with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
                     shutil.copyfileobj(response, out_file)
-                    download_bar.stop()
+                download_bar.stop()
                 progress_popup.destroy()
                 os.startfile(temp_path)
-                app.quit()
-            except:
-                pass
+                self.quit()
+            except Exception as e:
+                download_bar.stop()
+                progress_popup.destroy()
+                messagebox.showerror("Error", f"Failed to download update: {str(e)}")
 
 # --- Run App ---
 if __name__ == "__main__":
