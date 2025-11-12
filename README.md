@@ -43,8 +43,3 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 
 ### Support
 [Buy me a coffee](https://buymeacoffee.com/novafoundry)
-
-### License
-This project is licensed under the MIT License — see the LICENSE
- file for details.
-© Nova Foundry 2025
