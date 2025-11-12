@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import json
 import customtkinter as ctk
@@ -589,18 +590,16 @@ class PasswordManager(ctk.CTk):
         header.pack(fill="x", padx=12, pady=(12,0))
         ctk.CTkLabel(header, text="Black Hole Vault", font=("Helvetica", 18, "bold"),
                      text_color=TEXT, fg_color=BG).pack(side="left", padx=(6,12))
-        ctk.CTkLabel(header, text="Deep Space Glow", text_color=ACCENT_DIM, fg_color=BG).pack(side="left")
 
         self.cards_frame = ctk.CTkScrollableFrame(self, width=860, height=420, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
 
         btn_frame = ctk.CTkFrame(self, fg_color=BG)
         btn_frame.pack(pady=(0,12))
-        ctk.CTkButton(btn_frame, text="Create New", command=self.create_new_card,
+        ctk.CTkButton(btn_frame, text="Add New", command=self.create_new_card,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
         ctk.CTkButton(btn_frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
-        ctk.CTkButton(btn_frame, text="Export DOCX", command=self.export_docx, fg_color="#2f3b4a").pack(side="left", padx=8)
-        ctk.CTkButton(btn_frame, text="Export ODT", command=self.export_odt, fg_color="#2f3b4a").pack(side="left", padx=8)
+        ctk.CTkButton(btn_frame, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
 
     # --- Load Cards ---
     def load_cards(self):
@@ -744,6 +743,32 @@ class PasswordManager(ctk.CTk):
             self.load_cards()
 
     # --- Export ---
+    def export_popup(self):
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.title("Export Passwords")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
+
+        ctk.CTkLabel(popup, text="Export Passwords", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
+        ctk.CTkLabel(popup, text="Choose export format:", text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+
+        btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
+        btn_frame.pack(pady=(12,12))
+
+        ctk.CTkButton(btn_frame, text=".docx", command=self.export_docx,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
+        ctk.CTkButton(btn_frame, text=".odt", command=self.export_odt,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
+
+        center_popup(popup)
+        self.wait_window(popup)
+
     def export_docx(self):
         doc = Document()
         for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
