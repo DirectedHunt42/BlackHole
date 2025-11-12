@@ -42,6 +42,15 @@ def derive_key(password: str, salt: bytes) -> bytes:
     )
     return urlsafe_b64encode(kdf.derive(password.encode()))
 
+# --- Helper: Center Popup ---
+def center_popup(popup):
+    popup.update_idletasks()
+    width = popup.winfo_reqwidth()
+    height = popup.winfo_reqheight()
+    x = (popup.winfo_screenwidth() // 2) - (width // 2)
+    y = (popup.winfo_screenheight() // 2) - (height // 2)
+    popup.geometry(f"{width}x{height}+{x}+{y}")
+
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
     def __init__(self):
@@ -99,7 +108,7 @@ class PasswordManager(ctk.CTk):
         self.configure(fg_color=BG)
         self._build_ui()
         self.attributes('-alpha', 1.0)
-        self.state('zoomed')
+        self.wm_state('zoomed')
         self.load_cards()
 
     # --- Setup modal: New or Import ---
@@ -109,12 +118,11 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-
-        # Center popup
-        width, height = 480, 200
-        x = (popup.winfo_screenwidth() // 2) - (width // 2)
-        y = (popup.winfo_screenheight() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         closed_by_user = {"val": True}
 
@@ -153,6 +161,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Import Vault", command=setup_import,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
 
+        center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"]
 
@@ -227,11 +236,11 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-
-        width, height = 480, 240
-        x = (popup.winfo_screenwidth() // 2) - (width // 2)
-        y = (popup.winfo_screenheight() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         closed_by_user = {"val": True}
 
@@ -266,6 +275,7 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,10))
 
         sync_entry.focus_set()
+        center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"]
 
@@ -276,11 +286,11 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-
-        width, height = 480, 280
-        x = (popup.winfo_screenwidth() // 2) - (width // 2)
-        y = (popup.winfo_screenheight() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         def on_close():
             popup.grab_release()
@@ -315,6 +325,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="OK", command=on_close,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
 
+        center_popup(popup)
         self.wait_window(popup)
 
     # --- Master Create modal ---
@@ -324,11 +335,11 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-
-        width, height = 480, 320
-        x = (popup.winfo_screenwidth() // 2) - (width // 2)
-        y = (popup.winfo_screenheight() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         closed_by_user = {"val": True}
 
@@ -438,6 +449,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
 
         pwd_entry.focus_set()
+        center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
 
@@ -448,11 +460,11 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-
-        width, height = 480, 320
-        x = (popup.winfo_screenwidth() // 2) - (width // 2)
-        y = (popup.winfo_screenheight() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         closed_by_user = {"val": True}
 
@@ -543,6 +555,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
 
         pwd_entry.focus_set()
+        center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
 
@@ -631,9 +644,14 @@ class PasswordManager(ctk.CTk):
     def create_new_card(self):
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
-        popup.geometry("420x220")
         popup.title("Create New Password")
         popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         ctk.CTkLabel(popup, text="Create New Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
         title_var = StringVar()
@@ -653,6 +671,8 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Create", command=create_card_action,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=140).pack(pady=(12,10))
 
+        center_popup(popup)
+
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
         row = self.c.execute("SELECT title, username, password, notes FROM passwords WHERE id=?", (id_,)).fetchone()
@@ -667,9 +687,14 @@ class PasswordManager(ctk.CTk):
 
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
-        popup.geometry("480x420")
         popup.title("Edit Entry")
         popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
 
         ctk.CTkLabel(popup, text="Edit Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
 
@@ -703,6 +728,8 @@ class PasswordManager(ctk.CTk):
             self.load_cards()
 
         ctk.CTkButton(popup, text="Save", command=save_card, fg_color=ACCENT, text_color=BG, width=120).pack(pady=(6,12))
+
+        center_popup(popup)
 
     # --- Delete ---
     def delete_card(self, id_):
