@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Black Hole"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Nova Foundry"
 #define MyAppURL "https://github.com/DirectedHunt42"
 #define MyAppExeName "BlackHole.exe"
