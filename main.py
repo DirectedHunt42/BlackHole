@@ -118,7 +118,7 @@ class PasswordManager(ctk.CTk):
         self.configure(fg_color=BG)
         self._build_ui()
         self.attributes('-alpha', 1.0)
-        self.state('zoomed')
+        self.after(0, lambda: self.state('zoomed'))
         self.load_cards()
         self.check_for_update()
 
@@ -732,17 +732,25 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pwd = ""
 
-            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=30, width=300, height=350, border_width=0)
+            # Added shadow simulation by wrapping the card in an outer frame with a slight offset and border
+            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", corner_radius=35, width=310, height=410, border_width=0)
             row_num = i // num_columns
             col = i % num_columns
-            card.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
+            shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
-            def on_enter(e, f=card):
+            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=300, height=400, border_width=0)
+            card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
+
+            def on_enter(e, f=card, sf=shadow_frame):
                 f.configure(fg_color=CARD_HOVER, border_width=2, border_color=ACCENT)
-            def on_leave(e, f=card):
+                sf.configure(fg_color="gray30")
+            def on_leave(e, f=card, sf=shadow_frame):
                 f.configure(fg_color=CARD, border_width=0)
+                sf.configure(fg_color="gray20")
             card.bind("<Enter>", on_enter)
             card.bind("<Leave>", on_leave)
+            shadow_frame.bind("<Enter>", on_enter)
+            shadow_frame.bind("<Leave>", on_leave)
 
             image_frame = ctk.CTkFrame(card, height=300, fg_color="transparent", corner_radius=30)
             image_frame.pack(fill="x", expand=False)
@@ -756,20 +764,20 @@ class PasswordManager(ctk.CTk):
                 except:
                     pass
 
-            bottom_frame = ctk.CTkFrame(card, height=50, fg_color=CARD, corner_radius=30)
+            bottom_frame = ctk.CTkFrame(card, height=100, fg_color=CARD, corner_radius=30)
             bottom_frame.pack(fill="x", expand=True)
 
             left = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
             left.pack(side="left", fill="both", expand=True, padx=4, pady=4)
             title_label = ctk.CTkLabel(left, text=title or "(No title)", anchor="w",
-                         font=("Helvetica", 10, "bold"), text_color=TEXT, fg_color=CARD)
+                        font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=CARD)  # Increased font size
             title_label.pack(anchor="w")
             user_label = ctk.CTkLabel(left, text=f"User: {user or ''}", anchor="w",
-                         text_color=ACCENT_DIM, fg_color=CARD, font=("Helvetica", 8))
+                        text_color=ACCENT_DIM, fg_color=CARD, font=("Helvetica", 12))  # Increased font size
             user_label.pack(anchor="w")
 
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
-            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Helvetica", 8))
+            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Helvetica", 12))  # Increased font size
             pwd_label.pack(anchor="w")
 
             def copy_text(text, msg="Copied to clipboard!"):
@@ -787,10 +795,16 @@ class PasswordManager(ctk.CTk):
             def toggle_show(pw=pwd, var=pwd_var):
                 var.set(pw if var.get().startswith("*") else "*"*len(pw))
             ctk.CTkButton(right, text="Show", command=toggle_show,
-                           width=60, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, font=("Helvetica", 8)).pack(pady=2)
-            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Helvetica", 8)).pack(pady=2)
+                        width=60, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
+
+            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
+
+            def show_notes(n=notes):
+                messagebox.showinfo("Notes", n or "No notes")
+            ctk.CTkButton(right, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Helvetica", 10)).pack(pady=2)  # Added Notes button
+
             ctk.CTkButton(right, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
-                           fg_color="#7a2d2d", font=("Helvetica", 8)).pack(pady=2)
+                        fg_color="#7a2d2d", font=("Helvetica", 10)).pack(pady=2)  # Increased font size
 
     # --- Create Card ---
     def create_new_card(self):
