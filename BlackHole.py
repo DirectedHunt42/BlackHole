@@ -1,3 +1,4 @@
+import math
 import os
 import shutil
 import sys
@@ -23,7 +24,7 @@ APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -731,7 +732,7 @@ class PasswordManager(ctk.CTk):
 
         rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC").fetchall()
 
-        num_columns = self.cards_frame.grid_size()[0]
+        num_columns = max(1, int(self.winfo_width() // 40))
 
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes, icon_path = row
@@ -741,40 +742,40 @@ class PasswordManager(ctk.CTk):
                 pwd = ""
 
             # Added shadow simulation by wrapping the card in an outer frame with a slight offset and border
-            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=310, height=410, border_width=0)
+            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=360, height=470, border_width=0)
             row_num = i // num_columns
             col = i % num_columns
             shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
-            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=300, height=410, border_width=0)
+            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=360, height=450, border_width=0)
             card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
 
-            image_frame = ctk.CTkFrame(card, height=300, fg_color="transparent", corner_radius=30)
+            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=30)
             image_frame.pack(fill="x", expand=False)
             if icon_path and os.path.exists(icon_path):
                 try:
                     pil_img = Image.open(icon_path)
-                    pil_img = pil_img.resize((300, 300), Image.LANCZOS)
-                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(300, 300))
+                    pil_img = pil_img.resize((350, 350), Image.LANCZOS)
+                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(350, 350))
                     image_label = ctk.CTkLabel(image_frame, image=ctk_img, text="")
                     image_label.pack(expand=True, fill="both")
                 except:
                     pass
 
-            bottom_frame = ctk.CTkFrame(card, height=100, fg_color=CARD, corner_radius=30)
+            bottom_frame = ctk.CTkFrame(card, height=150, fg_color=CARD)
             bottom_frame.pack(fill="x", expand=True)
 
             left = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
             left.pack(side="left", fill="both", expand=True, padx=4, pady=4)
             title_label = ctk.CTkLabel(left, text=title or "(No title)", anchor="w",
-                        font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=CARD)  # Increased font size
+                        font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=CARD, width=50, wraplength=200)  # Increased font size
             title_label.pack(anchor="w")
             user_label = ctk.CTkLabel(left, text=f"User: {user or ''}", anchor="w",
-                        text_color=ACCENT_DIM, fg_color=CARD, font=("Helvetica", 12))  # Increased font size
+                        text_color=ACCENT_DIM, fg_color=CARD, font=("Helvetica", 12), width=50, wraplength=200)  # Increased font size
             user_label.pack(anchor="w")
 
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
-            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Helvetica", 12))  # Increased font size
+            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Helvetica", 12), width=50, wraplength=200)  # Increased font size
             pwd_label.pack(anchor="w")
 
             def copy_text(text, msg="Copied to clipboard!"):
