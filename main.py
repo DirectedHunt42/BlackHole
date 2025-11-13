@@ -131,7 +131,7 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -249,7 +249,7 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -299,7 +299,7 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -348,7 +348,7 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -473,7 +473,7 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH)))
             except Exception:
                 pass
 
@@ -511,6 +511,8 @@ class PasswordManager(ctk.CTk):
 
         btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
         btn_frame.pack(pady=(12,12))
+
+        pwd_entry.bind("<Return>", lambda event: unlock_master())
 
         def mark_wrong():
             pwd_entry.configure(fg_color="#7a2d2d")
@@ -583,7 +585,7 @@ class PasswordManager(ctk.CTk):
         popup.attributes("-topmost", True)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -723,7 +725,7 @@ class PasswordManager(ctk.CTk):
 
         rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC").fetchall()
 
-        num_columns = 4  # Reduced for larger cards
+        num_columns = self.cards_frame.grid_size()[0]
 
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes, icon_path = row
@@ -733,24 +735,13 @@ class PasswordManager(ctk.CTk):
                 pwd = ""
 
             # Added shadow simulation by wrapping the card in an outer frame with a slight offset and border
-            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", corner_radius=35, width=310, height=410, border_width=0)
+            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=310, height=410, border_width=0)
             row_num = i // num_columns
             col = i % num_columns
             shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
-            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=300, height=400, border_width=0)
+            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=300, height=410, border_width=0)
             card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
-
-            def on_enter(e, f=card, sf=shadow_frame):
-                f.configure(fg_color=CARD_HOVER, border_width=2, border_color=ACCENT)
-                sf.configure(fg_color="gray30")
-            def on_leave(e, f=card, sf=shadow_frame):
-                f.configure(fg_color=CARD, border_width=0)
-                sf.configure(fg_color="gray20")
-            card.bind("<Enter>", on_enter)
-            card.bind("<Leave>", on_leave)
-            shadow_frame.bind("<Enter>", on_enter)
-            shadow_frame.bind("<Leave>", on_leave)
 
             image_frame = ctk.CTkFrame(card, height=300, fg_color="transparent", corner_radius=30)
             image_frame.pack(fill="x", expand=False)
@@ -792,18 +783,21 @@ class PasswordManager(ctk.CTk):
             right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
             right.pack(side="right", padx=4, pady=4)
 
+            righter = ctk.CTkFrame(right, fg_color=CARD, corner_radius=0)
+            righter.pack(side="right", padx=4, pady=0)
+
             def toggle_show(pw=pwd, var=pwd_var):
                 var.set(pw if var.get().startswith("*") else "*"*len(pw))
             ctk.CTkButton(right, text="Show", command=toggle_show,
-                        width=60, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
+                        width=60, fg_color=ACCENT, text_color=BG, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
 
             ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
 
             def show_notes(n=notes):
                 messagebox.showinfo("Notes", n or "No notes")
-            ctk.CTkButton(right, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Helvetica", 10)).pack(pady=2)  # Added Notes button
+            ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Helvetica", 10)).pack(pady=2)  # Added Notes button
 
-            ctk.CTkButton(right, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
+            ctk.CTkButton(righter, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
                         fg_color="#7a2d2d", font=("Helvetica", 10)).pack(pady=2)  # Increased font size
 
     # --- Create Card ---
@@ -815,7 +809,7 @@ class PasswordManager(ctk.CTk):
         popup.resizable(False, False)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -858,7 +852,7 @@ class PasswordManager(ctk.CTk):
         popup.resizable(False, False)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -939,7 +933,7 @@ class PasswordManager(ctk.CTk):
         popup.resizable(False, False)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -1004,7 +998,7 @@ class PasswordManager(ctk.CTk):
         popup.resizable(False, False)
         if os.path.exists(APP_ICON_PATH):
             try:
-                popup.iconbitmap(APP_ICON_PATH)
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
             except Exception:
                 pass
 
@@ -1108,7 +1102,7 @@ class PasswordManager(ctk.CTk):
             progress_popup.resizable(False, False)
             if os.path.exists(APP_ICON_PATH):
                 try:
-                    progress_popup.iconbitmap(APP_ICON_PATH)
+                    progress_popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
                 except Exception:
                     pass
             ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
