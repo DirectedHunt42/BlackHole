@@ -23,7 +23,7 @@ APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -1094,19 +1094,24 @@ class PasswordManager(ctk.CTk):
 
         def do_update_confirm(data):
             try:
-                title = data.get('name', '')
-                if title.startswith("Release "):
+                title = data.get('name', '').strip()
+                if title.lower().startswith("release "):
                     new_ver = title[len("Release "):].strip()
+                elif title.lower().startswith("v"):
+                    new_ver = title[1:].strip()
                 else:
-                    return
+                    new_ver = title
+
                 current_ver = VERSION
+
                 def version_to_tuple(v):
-                    return tuple(map(int, (v.split("."))))
+                    return tuple(map(int, v.strip("v").split(".")))
+
                 if version_to_tuple(new_ver) > version_to_tuple(current_ver):
                     if messagebox.askyesno("Update Available", f"A new version ({new_ver}) is available. Do you want to download and install it?"):
                         download_and_install(data)
-            except:
-                pass
+            except Exception as e:
+                print(f"Update check failed: {e}")
 
         def download_and_install(data):
             progress_popup = ctk.CTkToplevel(self)
