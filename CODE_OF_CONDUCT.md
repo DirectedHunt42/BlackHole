@@ -41,14 +41,6 @@ It also applies when an individual represents the project or its community in pu
 
 ---
 
-## 💬 Contact
-
-If you have concerns or questions related to this Code of Conduct, please reach out to:
-
-📧 **jackpwmurray@gmail.com**
-
----
-
 ## 🪶 Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org), version 2.1.
