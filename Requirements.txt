@@ -4,4 +4,3 @@ python-docx
 odfpy
 pyperclip
 pillow
-webbrowser
