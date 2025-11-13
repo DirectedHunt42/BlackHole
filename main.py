@@ -118,13 +118,7 @@ class PasswordManager(ctk.CTk):
         self.configure(fg_color=BG)
         self._build_ui()
         self.attributes('-alpha', 1.0)
-        self.screen_width = self.winfo_screenwidth()
-        self.screen_height = self.winfo_screenheight()
-        win_width = int(self.screen_width * 0.9)
-        win_height = int(self.screen_height * 0.9)
-        x = (self.screen_width - win_width) // 2
-        y = (self.screen_height - win_height) // 2
-        self.geometry(f"{win_width}x{win_height}+{x}+{y}")
+        self.state('zoomed')
         self.load_cards()
         self.check_for_update()
 
@@ -738,7 +732,7 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pwd = ""
 
-            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=20, width=300, height=350, border_width=0)
+            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=30, width=300, height=350, border_width=0)
             row_num = i // num_columns
             col = i % num_columns
             card.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
@@ -750,7 +744,7 @@ class PasswordManager(ctk.CTk):
             card.bind("<Enter>", on_enter)
             card.bind("<Leave>", on_leave)
 
-            image_frame = ctk.CTkFrame(card, height=300, fg_color="transparent")
+            image_frame = ctk.CTkFrame(card, height=300, fg_color="transparent", corner_radius=30)
             image_frame.pack(fill="x", expand=False)
             if icon_path and os.path.exists(icon_path):
                 try:
@@ -762,7 +756,7 @@ class PasswordManager(ctk.CTk):
                 except:
                     pass
 
-            bottom_frame = ctk.CTkFrame(card, height=50, fg_color=CARD)
+            bottom_frame = ctk.CTkFrame(card, height=50, fg_color=CARD, corner_radius=30)
             bottom_frame.pack(fill="x", expand=True)
 
             left = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
@@ -811,9 +805,9 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
-        ctk.CTkLabel(popup, text="Create New Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
+        ctk.CTkLabel(popup, text="Create New Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG, justify="center").pack(pady=(12,6))
         title_var = StringVar()
-        ctk.CTkEntry(popup, placeholder_text="Title (required)", textvariable=title_var, width=360).pack(pady=8)
+        ctk.CTkEntry(popup, placeholder_text="Title (required)", textvariable=title_var, width=320).pack(pady=8)
 
         def create_card_action():
             title = title_var.get().strip()
