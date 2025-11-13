@@ -118,7 +118,13 @@ class PasswordManager(ctk.CTk):
         self.configure(fg_color=BG)
         self._build_ui()
         self.attributes('-alpha', 1.0)
-        self.wm_state('zoomed')
+        self.screen_width = self.winfo_screenwidth()
+        self.screen_height = self.winfo_screenheight()
+        win_width = int(self.screen_width * 0.9)
+        win_height = int(self.screen_height * 0.9)
+        x = (self.screen_width - win_width) // 2
+        y = (self.screen_height - win_height) // 2
+        self.geometry(f"{win_width}x{win_height}+{x}+{y}")
         self.load_cards()
         self.check_for_update()
 
@@ -706,17 +712,15 @@ class PasswordManager(ctk.CTk):
         ctk.CTkLabel(header, text="Black Hole Vault", font=("Helvetica", 18, "bold"),
                      text_color=TEXT, fg_color=BG).pack(side="left", padx=(6,12))
 
+        ctk.CTkButton(header, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="Add New", command=self.create_new_card,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
+
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
-        self.cards_frame.grid_columnconfigure((0,1,2,3,4), weight=1)  # 5 columns for example
-
-        btn_frame = ctk.CTkFrame(self, fg_color=BG)
-        btn_frame.pack(pady=(0,12))
-        ctk.CTkButton(btn_frame, text="Add New", command=self.create_new_card,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
-        ctk.CTkButton(btn_frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
-        ctk.CTkButton(btn_frame, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(side="left", padx=8)
-        ctk.CTkButton(btn_frame, text="Reset", command=self.reset_app, fg_color="#7a2d2d", text_color=BG, hover_color="#5a1d1d").pack(side="left", padx=8)
+        self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)  # 4 columns for larger cards
 
     # --- Load Cards ---
     def load_cards(self):
@@ -725,7 +729,7 @@ class PasswordManager(ctk.CTk):
 
         rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC").fetchall()
 
-        num_columns = 5  # Adjust based on preference
+        num_columns = 4  # Reduced for larger cards
 
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes, icon_path = row
@@ -734,25 +738,25 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pwd = ""
 
-            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=10, width=200, height=250)
+            card = ctk.CTkFrame(self.cards_frame, fg_color=CARD, corner_radius=20, width=300, height=350, border_width=0)
             row_num = i // num_columns
             col = i % num_columns
             card.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
             def on_enter(e, f=card):
-                f.configure(fg_color=CARD_HOVER)
+                f.configure(fg_color=CARD_HOVER, border_width=2, border_color=ACCENT)
             def on_leave(e, f=card):
-                f.configure(fg_color=CARD)
+                f.configure(fg_color=CARD, border_width=0)
             card.bind("<Enter>", on_enter)
             card.bind("<Leave>", on_leave)
 
-            image_frame = ctk.CTkFrame(card, height=200, fg_color="transparent")
+            image_frame = ctk.CTkFrame(card, height=300, fg_color="transparent")
             image_frame.pack(fill="x", expand=False)
             if icon_path and os.path.exists(icon_path):
                 try:
                     pil_img = Image.open(icon_path)
-                    pil_img = pil_img.resize((200, 200), Image.LANCZOS)
-                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(200, 200))
+                    pil_img = pil_img.resize((300, 300), Image.LANCZOS)
+                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(300, 300))
                     image_label = ctk.CTkLabel(image_frame, image=ctk_img, text="")
                     image_label.pack(expand=True, fill="both")
                 except:
