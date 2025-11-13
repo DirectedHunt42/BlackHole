@@ -3,6 +3,7 @@ import shutil
 import sys
 import json
 import threading
+import webbrowser
 import customtkinter as ctk
 import sqlite3
 from cryptography.fernet import Fernet
@@ -1053,6 +1054,14 @@ class PasswordManager(ctk.CTk):
         license_box.insert("1.0", license_content)
         license_box.configure(state="disabled")
         license_box.pack(padx=20, pady=(0, 12))
+
+        support_link = ctk.CTkLabel(popup, text="Support Nova Foundry", font=("Helvetica", 12, "underline"),
+                                    text_color=ACCENT, fg_color=BG, cursor="hand2")
+        support_link.pack(pady=(0, 12))
+        def open_support_link(event):
+            webbrowser.open_new("https://buymeacoffee.com/novafoundry")
+
+        support_link.bind("<Button-1>", open_support_link)
 
         ctk.CTkButton(popup, text="OK", command=lambda: (popup.grab_release(), popup.destroy()),
                     fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0, 12))
