@@ -735,7 +735,7 @@ class PasswordManager(ctk.CTk):
         match(self.winfo_screenwidth()):
             case _ if self.winfo_screenwidth() >= 1900:
                 num_columns = 5
-            case _ if self.winfo_screenwidth() >= 1600:
+            case _ if self.winfo_screenwidth() >= 1500:
                 num_columns = 4
             case _ if self.winfo_screenwidth() >= 1200:
                 num_columns = 3
