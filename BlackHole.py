@@ -22,6 +22,7 @@ import urllib
 APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
+BLACK_HOLE_WIDE_LOGO = r"Icons\BlackHole_Transparent_Wide.png"
 LICENSE_TEXT = r"LICENSE.txt"
 VERSION = "1.3.0"
 
@@ -743,8 +744,17 @@ class PasswordManager(ctk.CTk):
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=BG, height=64)
         header.pack(fill="x", padx=12, pady=(12,0))
-        ctk.CTkLabel(header, text="Black Hole Vault", font=("Helvetica", 18, "bold"),
-                     text_color=TEXT, fg_color=BG).pack(side="left", padx=(6,12))
+        pil_image_bh = Image.open(BLACK_HOLE_WIDE_LOGO)
+        bh_width, bh_height = pil_image_bh.size
+        new_width_bh = 200
+        new_height_bh = int((new_width_bh / bh_width) * bh_height)
+        bh_ctk_image = ctk.CTkImage(
+            light_image=pil_image_bh,
+            dark_image=pil_image_bh,
+            size=(new_width_bh, new_height_bh) 
+        )
+        bh_label = ctk.CTkLabel(header, image=bh_ctk_image, text="")
+        bh_label.pack(side="left", padx=12, pady=(12, 6))
 
         # Search bar
         search_frame = ctk.CTkFrame(header, fg_color=BG)
