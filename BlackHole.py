@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from base64 import urlsafe_b64encode, urlsafe_b64decode
-from tkinter import messagebox, StringVar, filedialog
+from tkinter import messagebox, StringVar, filedialog, Listbox, END
 from docx import Document
 from odf.opendocument import OpenDocumentText
 from odf.text import P
@@ -34,8 +34,9 @@ stored_icons_path = os.path.join(nova_folder, "StoredIcons")
 os.makedirs(stored_icons_path, exist_ok=True)
 
 settings_path = os.path.join(nova_folder, "settings.json")
+order_path = os.path.join(nova_folder, "order.json")
 
-# --- Theme (Deep Space Glow) colors ---
+# --- Theme (Deep Space Glow) colours ---
 BG = "#05050a"
 CARD = "#0b0b0f"
 CARD_HOVER = "#111327"
@@ -104,6 +105,18 @@ class PasswordManager(ctk.CTk):
                     self.db_path = self.settings["db_path"]
             except Exception:
                 self.settings = {"master_password_set": False}
+
+        # load order settings
+        self.order_mode = "default"
+        self.custom_order = []
+        if os.path.exists(order_path):
+            try:
+                with open(order_path, "r") as f:
+                    data = json.load(f)
+                    self.order_mode = data.get("mode", "default")
+                    self.custom_order = data.get("custom_order", [])
+            except Exception:
+                pass
 
         # Check if setup is needed
         if not self.settings.get("master_password_set", False) or not self.db_path:
@@ -707,12 +720,46 @@ class PasswordManager(ctk.CTk):
                 raise
         self.conn.commit()
 
+    # --- Save Order ---
+    def _save_order(self):
+        data = {
+            "mode": self.order_mode,
+            "custom_order": self.custom_order if self.order_mode == "custom" else []
+        }
+        try:
+            with open(order_path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except Exception:
+            pass
+
     # --- Build UI ---
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=BG, height=64)
         header.pack(fill="x", padx=12, pady=(12,0))
         ctk.CTkLabel(header, text="Black Hole Vault", font=("Helvetica", 18, "bold"),
                      text_color=TEXT, fg_color=BG).pack(side="left", padx=(6,12))
+
+        # Sort options
+        sort_frame = ctk.CTkFrame(header, fg_color=BG)
+        sort_frame.pack(side="right", padx=12)
+        ctk.CTkLabel(sort_frame, text="Sort:", font=("Helvetica", 12), text_color=TEXT, fg_color=BG).pack(side="left", padx=4)
+
+        sort_values = ["Default", "Title A-Z", "Title Z-A", "Custom"]
+        display_mode = {
+            "default": "Default",
+            "a-z": "Title A-Z",
+            "z-a": "Title Z-A",
+            "custom": "Custom"
+        }.get(self.order_mode, "Default")
+        self.sort_var = StringVar(value=display_mode)
+        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Helvetica", 12))
+        self.sort_combo.pack(side="left", padx=4)
+        self.sort_combo.bind("<<ComboBoxSelected>>", self._change_sort)
+
+        if self.order_mode == "custom":
+            self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
+                                                fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12))
+            self.edit_order_btn.pack(side="left", padx=4)
 
         ctk.CTkButton(header, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
         ctk.CTkButton(header, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
@@ -725,12 +772,55 @@ class PasswordManager(ctk.CTk):
         self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)  # 4 columns for larger cards
         self.check_for_update()
 
+    def _change_sort(self, event=None):
+        val = self.sort_var.get()
+        if val == "Title A-Z":
+            self.order_mode = "a-z"
+        elif val == "Title Z-A":
+            self.order_mode = "z-a"
+        elif val == "Custom":
+            self.order_mode = "custom"
+        else:
+            self.order_mode = "default"
+        self._save_order()
+        self.load_cards()
+
+        if self.order_mode == "custom":
+            if not hasattr(self, "edit_order_btn"):
+                sort_frame = self.sort_combo.master
+                self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
+                                                    fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12))
+                self.edit_order_btn.pack(side="left", padx=4)
+        else:
+            if hasattr(self, "edit_order_btn"):
+                self.edit_order_btn.destroy()
+                del self.edit_order_btn
+
     # --- Load Cards ---
     def load_cards(self):
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
 
-        rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC").fetchall()
+        if self.order_mode == "default":
+            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC")
+        elif self.order_mode == "a-z":
+            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY LOWER(title) ASC")
+        elif self.order_mode == "z-a":
+            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY LOWER(title) DESC")
+        else:  # custom
+            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords")
+            rows = self.c.fetchall()
+            current_ids = [r[0] for r in rows]
+            self.custom_order = [id_ for id_ in self.custom_order if id_ in current_ids]
+            new_ids = [id_ for id_ in current_ids if id_ not in self.custom_order]
+            new_ids.sort(reverse=True)
+            self.custom_order += new_ids
+            self._save_order()
+            id_to_row = {r[0]: r for r in rows}
+            rows = [id_to_row[id_] for id_ in self.custom_order if id_ in id_to_row]
+            rows = rows  # For consistency
+
+        rows = self.c.fetchall() if self.order_mode != "custom" else rows
 
         match(self.winfo_screenwidth()):
             case _ if self.winfo_screenwidth() >= 1900:
@@ -841,6 +931,10 @@ class PasswordManager(ctk.CTk):
                 return
             self.c.execute("INSERT INTO passwords (title, username, password, notes, icon_path) VALUES (?, ?, ?, ?, ?)", (title, "", "", "", ""))
             self.conn.commit()
+            if self.order_mode == "custom":
+                new_id = self.c.lastrowid
+                self.custom_order.append(new_id)
+                self._save_order()
             popup.grab_release()
             popup.destroy()
             self.load_cards()
@@ -939,7 +1033,98 @@ class PasswordManager(ctk.CTk):
                     pass
             self.c.execute("DELETE FROM passwords WHERE id=?", (id_,))
             self.conn.commit()
+            if self.order_mode == "custom" and id_ in self.custom_order:
+                self.custom_order.remove(id_)
+                self._save_order()
             self.load_cards()
+
+    # --- Custom Order Popup ---
+    def edit_custom_order(self):
+        # Update custom_order with current entries
+        self.c.execute("SELECT id FROM passwords")
+        current_ids = [r[0] for r in self.c.fetchall()]
+        self.custom_order = [id_ for id_ in self.custom_order if id_ in current_ids]
+        new_ids = [id_ for id_ in current_ids if id_ not in self.custom_order]
+        new_ids.sort(reverse=True)
+        self.custom_order += new_ids
+        self._save_order()
+
+        # Get titles
+        self.c.execute("SELECT id, title FROM passwords")
+        id_to_title = {r[0]: r[1] for r in self.c.fetchall()}
+
+        popup = ctk.CTkToplevel(self)
+        popup.title("Custom Order")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        popup.grab_set()
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+
+        ctk.CTkLabel(popup, text="Reorder Entries", font=("Helvetica", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+
+        frame = ctk.CTkFrame(popup, fg_color=BG)
+        frame.pack(padx=20, pady=10, fill="both", expand=True)
+
+        lb = Listbox(frame, bg=CARD, fg=TEXT, selectbackground=ACCENT, selectforeground=BG, font=("Helvetica", 12), height=15, width=40)
+        lb.pack(side="left", fill="both", expand=True)
+
+        scroll = ctk.CTkScrollbar(frame, command=lb.yview)
+        scroll.pack(side="right", fill="y")
+        lb.configure(yscrollcommand=scroll.set)
+
+        reorder_ids = self.custom_order[:]
+        for id_ in reorder_ids:
+            title = id_to_title.get(id_, f"ID {id_}")
+            lb.insert(END, title or "(No title)")
+
+        def move_up():
+            try:
+                i = lb.curselection()[0]
+                if i == 0:
+                    return
+                text = lb.get(i)
+                lb.delete(i)
+                lb.insert(i-1, text)
+                lb.selection_set(i-1)
+                # Swap ids
+                reorder_ids[i], reorder_ids[i-1] = reorder_ids[i-1], reorder_ids[i]
+            except:
+                pass
+
+        def move_down():
+            try:
+                i = lb.curselection()[0]
+                if i == lb.size() - 1:
+                    return
+                text = lb.get(i)
+                lb.delete(i)
+                lb.insert(i+1, text)
+                lb.selection_set(i+1)
+                # Swap ids
+                reorder_ids[i], reorder_ids[i+1] = reorder_ids[i+1], reorder_ids[i]
+            except:
+                pass
+
+        btn_frame = ctk.CTkFrame(popup, fg_color=BG)
+        btn_frame.pack(pady=10)
+
+        ctk.CTkButton(btn_frame, text="Up", command=move_up, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=60).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="Down", command=move_down, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=60).pack(side="left", padx=5)
+
+        def save_reorder():
+            self.custom_order = reorder_ids
+            self._save_order()
+            self.load_cards()
+            popup.grab_release()
+            popup.destroy()
+
+        ctk.CTkButton(popup, text="Save", command=save_reorder, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0,12))
+
+        center_popup(popup)
 
     # --- Export ---
     def export_popup(self):
