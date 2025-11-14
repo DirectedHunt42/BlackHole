@@ -738,6 +738,18 @@ class PasswordManager(ctk.CTk):
         ctk.CTkLabel(header, text="Black Hole Vault", font=("Helvetica", 18, "bold"),
                      text_color=TEXT, fg_color=BG).pack(side="left", padx=(6,12))
 
+        # Search bar
+        search_frame = ctk.CTkFrame(header, fg_color=BG)
+        search_frame.pack(side="left", fill="x", expand=True)
+        search_subframe = ctk.CTkFrame(search_frame, fg_color=BG)
+        search_subframe.pack(pady=16, padx=20, fill="x")
+        search_label = ctk.CTkLabel(search_subframe, text="🔍 Search", font=("Helvetica", 12), text_color=TEXT)
+        search_label.pack(side="left", padx=(0, 5))
+        self.search_var = StringVar()
+        self.search_entry = ctk.CTkEntry(search_subframe, textvariable=self.search_var, placeholder_text="by title")
+        self.search_entry.pack(side="left", fill="x", expand=True)
+        self.search_entry.bind("<KeyRelease>", lambda e: self.load_cards())
+
         # Sort options
         sort_frame = ctk.CTkFrame(header, fg_color=BG)
         sort_frame.pack(side="right", padx=12)
@@ -798,6 +810,8 @@ class PasswordManager(ctk.CTk):
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
 
+        search_term = self.search_var.get().strip().lower()
+
         if self.order_mode == "default":
             self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC")
         elif self.order_mode == "a-z":
@@ -817,6 +831,9 @@ class PasswordManager(ctk.CTk):
             rows = [id_to_row[id_] for id_ in self.custom_order if id_ in id_to_row]
 
         rows = self.c.fetchall() if self.order_mode != "custom" else rows
+
+        if search_term:
+            rows = [r for r in rows if search_term in r[1].lower()]
 
         match(self.winfo_screenwidth()):
             case _ if self.winfo_screenwidth() >= 2200:
