@@ -823,6 +823,8 @@ class PasswordManager(ctk.CTk):
         rows = self.c.fetchall() if self.order_mode != "custom" else rows
 
         match(self.winfo_screenwidth()):
+            case _ if self.winfo_screenwidth() >= 2200:
+                num_columns = 6
             case _ if self.winfo_screenwidth() >= 1900:
                 num_columns = 5
             case _ if self.winfo_screenwidth() >= 1500:
