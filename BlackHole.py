@@ -24,7 +24,7 @@ APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -135,7 +135,6 @@ class PasswordManager(ctk.CTk):
         self.attributes('-alpha', 1.0)
         self.after(0, lambda: self.state('zoomed'))
         self.load_cards()
-        self.after(200, self.check_for_update())
 
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
@@ -725,7 +724,7 @@ class PasswordManager(ctk.CTk):
     def _save_order(self):
         data = {
             "mode": self.order_mode,
-            "custom_order": self.custom_order if self.order_mode == "custom" else []
+            "custom_order": self.custom_order
         }
         try:
             with open(order_path, "w", encoding="utf-8") as f:
@@ -771,6 +770,7 @@ class PasswordManager(ctk.CTk):
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)  # 4 columns for larger cards
+        self.check_for_update()
 
     def _change_sort(self, event=None):
         val = self.sort_var.get()
@@ -818,7 +818,6 @@ class PasswordManager(ctk.CTk):
             self._save_order()
             id_to_row = {r[0]: r for r in rows}
             rows = [id_to_row[id_] for id_ in self.custom_order if id_ in id_to_row]
-            rows = rows  # For consistency
 
         rows = self.c.fetchall() if self.order_mode != "custom" else rows
 
@@ -849,10 +848,10 @@ class PasswordManager(ctk.CTk):
             col = i % num_columns
             shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
-            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=0, width=360, height=450, border_width=0)
+            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=360, height=450, border_width=0)
             card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
 
-            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=0)
+            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=30)
             image_frame.pack(fill="x", expand=False)
             if icon_path and os.path.exists(icon_path):
                 try:
@@ -1083,33 +1082,40 @@ class PasswordManager(ctk.CTk):
             title = id_to_title.get(id_, f"ID {id_}")
             lb.insert(END, title or "(No title)")
 
-        def move_up():
+        def move_up(event=None):
             try:
                 i = lb.curselection()[0]
                 if i == 0:
-                    return
+                    return "break"
                 text = lb.get(i)
                 lb.delete(i)
                 lb.insert(i-1, text)
                 lb.selection_set(i-1)
                 # Swap ids
                 reorder_ids[i], reorder_ids[i-1] = reorder_ids[i-1], reorder_ids[i]
+                return "break"
             except:
                 pass
+            return "break"
 
-        def move_down():
+        def move_down(event=None):
             try:
                 i = lb.curselection()[0]
                 if i == lb.size() - 1:
-                    return
+                    return "break"
                 text = lb.get(i)
                 lb.delete(i)
                 lb.insert(i+1, text)
                 lb.selection_set(i+1)
                 # Swap ids
                 reorder_ids[i], reorder_ids[i+1] = reorder_ids[i+1], reorder_ids[i]
+                return "break"
             except:
                 pass
+            return "break"
+
+        lb.bind("<Up>", move_up)
+        lb.bind("<Down>", move_down)
 
         btn_frame = ctk.CTkFrame(popup, fg_color=BG)
         btn_frame.pack(pady=10)
@@ -1286,8 +1292,7 @@ class PasswordManager(ctk.CTk):
                 with urllib.request.urlopen(req) as response:
                     data = json.loads(response.read().decode('utf-8'))
                 self.after(0, lambda d=data: do_update_confirm(d))
-            except Exception as e:
-                print(f"Failed to check for updates: {e}")
+            except:
                 pass
         threading.Thread(target=check_task, daemon=True).start()
 
