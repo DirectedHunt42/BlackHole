@@ -732,7 +732,17 @@ class PasswordManager(ctk.CTk):
 
         rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC").fetchall()
 
-        num_columns = max(1, int(self.winfo_width() // 40))
+        match(self.winfo_screenwidth()):
+            case _ if self.winfo_screenwidth() >= 1900:
+                num_columns = 5
+            case _ if self.winfo_screenwidth() >= 1600:
+                num_columns = 4
+            case _ if self.winfo_screenwidth() >= 1200:
+                num_columns = 3
+            case _ if self.winfo_screenwidth() >= 800:
+                num_columns = 2
+            case _:
+                num_columns = 1
 
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes, icon_path = row
