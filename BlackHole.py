@@ -23,7 +23,7 @@ APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -134,6 +134,12 @@ class PasswordManager(ctk.CTk):
         self.attributes('-alpha', 1.0)
         self.after(0, lambda: self.state('zoomed'))
         self.load_cards()
+
+        # Keyboard bindings for main window
+        self.bind("<Control-f>", lambda e: self.search_entry.focus())
+        self.bind("<Control-s>", lambda e: self.export_popup())
+        self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
+        self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
 
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
@@ -476,6 +482,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
 
         pwd_entry.focus_set()
+        pwd_entry.bind("<Return>", lambda e: create_master())
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
@@ -695,6 +702,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
 
         pwd_entry.focus_set()
+        pwd_entry.bind("<Return>", lambda e: verify_master())
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and verified
@@ -939,7 +947,8 @@ class PasswordManager(ctk.CTk):
 
         ctk.CTkLabel(popup, text="Create New Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG, justify="center").pack(pady=(12,6))
         title_var = StringVar()
-        ctk.CTkEntry(popup, placeholder_text="Title (required)", textvariable=title_var, width=320).pack(pady=8)
+        title_entry = ctk.CTkEntry(popup, placeholder_text="Title (required)", textvariable=title_var, width=320)
+        title_entry.pack(pady=8)
 
         def create_card_action():
             title = title_var.get().strip()
@@ -959,6 +968,8 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Create", command=create_card_action,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=140).pack(pady=(12,10))
 
+        title_entry.focus_set()
+        popup.bind("<Return>", lambda e: create_card_action())
         center_popup(popup)
 
     # --- Edit Card Popup ---
@@ -1041,6 +1052,8 @@ class PasswordManager(ctk.CTk):
 
         ctk.CTkButton(popup, text="Save", command=save_card, fg_color=ACCENT, text_color=BG, width=120).pack(pady=(6,12))
 
+        popup.bind("<Control-s>", lambda e: save_card())
+        popup.bind("<Return>", lambda e: save_card())
         center_popup(popup)
 
     # --- Delete ---
@@ -1152,6 +1165,8 @@ class PasswordManager(ctk.CTk):
 
         ctk.CTkButton(popup, text="Save", command=save_reorder, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0,12))
 
+        popup.bind("<Control-s>", lambda e: save_reorder())
+        popup.bind("<Return>", lambda e: save_reorder())
         center_popup(popup)
 
     # --- Export ---
