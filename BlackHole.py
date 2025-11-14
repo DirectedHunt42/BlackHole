@@ -1,4 +1,3 @@
-import math
 import os
 import shutil
 import sys
@@ -752,9 +751,8 @@ class PasswordManager(ctk.CTk):
             "custom": "Custom"
         }.get(self.order_mode, "Default")
         self.sort_var = StringVar(value=display_mode)
-        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Helvetica", 12))
+        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Helvetica", 12), command=self._change_sort)
         self.sort_combo.pack(side="left", padx=4)
-        self.sort_combo.bind("<<ComboBoxSelected>>", self._change_sort)
 
         if self.order_mode == "custom":
             self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
@@ -769,7 +767,7 @@ class PasswordManager(ctk.CTk):
 
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
-        self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)  # 4 columns for larger cards
+        self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)
         self.check_for_update()
 
     def _change_sort(self, event=None):
@@ -848,10 +846,10 @@ class PasswordManager(ctk.CTk):
             col = i % num_columns
             shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
-            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=360, height=450, border_width=0)
+            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=0, width=360, height=450, border_width=0)
             card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
 
-            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=30)
+            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=0)
             image_frame.pack(fill="x", expand=False)
             if icon_path and os.path.exists(icon_path):
                 try:
