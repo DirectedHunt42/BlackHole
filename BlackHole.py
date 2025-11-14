@@ -24,7 +24,7 @@ APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
 NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.1.2"
+VERSION = "1.1.1"
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -122,6 +122,7 @@ class PasswordManager(ctk.CTk):
         self.attributes('-alpha', 1.0)
         self.after(0, lambda: self.state('zoomed'))
         self.load_cards()
+        self.after(200, self.check_for_update())
 
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
@@ -723,7 +724,6 @@ class PasswordManager(ctk.CTk):
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)  # 4 columns for larger cards
-        self.check_for_update()
 
     # --- Load Cards ---
     def load_cards(self):
@@ -1099,7 +1099,8 @@ class PasswordManager(ctk.CTk):
                 with urllib.request.urlopen(req) as response:
                     data = json.loads(response.read().decode('utf-8'))
                 self.after(0, lambda d=data: do_update_confirm(d))
-            except:
+            except Exception as e:
+                print(f"Failed to check for updates: {e}")
                 pass
         threading.Thread(target=check_task, daemon=True).start()
 
