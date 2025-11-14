@@ -767,7 +767,6 @@ class PasswordManager(ctk.CTk):
 
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
-        self.cards_frame.grid_columnconfigure((0,1,2,3), weight=1)
         self.check_for_update()
 
     def _change_sort(self, event=None):
@@ -833,6 +832,8 @@ class PasswordManager(ctk.CTk):
             case _:
                 num_columns = 1
 
+        self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
+
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes, icon_path = row
             try:
@@ -840,14 +841,15 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pwd = ""
 
-            # Added shadow simulation by wrapping the card in an outer frame with a slight offset and border
-            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=360, height=470, border_width=0)
+            shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=360, height=470, border_width=0, corner_radius=0)
             row_num = i // num_columns
             col = i % num_columns
             shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
             card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=0, width=360, height=450, border_width=0)
-            card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
+            card.grid(padx=8, pady=8, sticky="nsew")  # Use grid with padding for shadow effect
+            shadow_frame.grid_columnconfigure(0, weight=1)
+            shadow_frame.grid_rowconfigure(0, weight=1)
 
             image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=0)
             image_frame.pack(fill="x", expand=False)
