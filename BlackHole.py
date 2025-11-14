@@ -17,14 +17,31 @@ from odf.opendocument import OpenDocumentText
 from odf.text import P
 from PIL import Image, ImageTk
 import urllib
+import ctypes
 
 # --- App Icon ---
 APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
 BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
-NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
 BLACK_HOLE_WIDE_LOGO = r"Icons\BlackHole_Transparent_Wide.png"
+NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
+FONT_REGULAR = r"Fonts\Nunito-Regular.ttf"
+FONT_MEDIUM = r"Fonts\Nunito-Medium.ttf"
+FONT_BOLD = r"Fonts\Nunito-Black.ttf"
+FONT_LIGHT = r"Fonts\Nunito-Light.ttf"
+FONT_ITALIC = r"Fonts\Nunito-Italic.ttf"
+FONT_SEMIBOLD = r"Fonts\Nunito-SemiBold.ttf"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.3.0"
+VERSION = "1.3.1"
+
+# Load all the font files for Tkinter (on Windows)
+if sys.platform.startswith("win"):
+    fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
+    for font_path in fonts:
+        ctypes.windll.gdi32.AddFontResourceA(font_path.encode('utf-8'))
+    # Broadcast font change
+    HWND_BROADCAST = 0xFFFF
+    WM_FONTCHANGE = 0x001D
+    ctypes.windll.user32.SendMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
 
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
@@ -166,7 +183,7 @@ class PasswordManager(ctk.CTk):
 
         # Header
         ctk.CTkLabel(popup, text="Black Hole — Setup",
-                     font=("Helvetica", 16, "bold"),
+                     font=("Nunito", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         ctk.CTkLabel(popup, text="Set up a new vault or import an existing one?",
                      text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
@@ -283,7 +300,7 @@ class PasswordManager(ctk.CTk):
         popup.protocol("WM_DELETE_WINDOW", on_close)
 
         ctk.CTkLabel(popup, text="Enter Sync Key",
-                     font=("Helvetica", 16, "bold"),
+                     font=("Nunito", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
 
         frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
@@ -332,7 +349,7 @@ class PasswordManager(ctk.CTk):
         popup.protocol("WM_DELETE_WINDOW", on_close)
 
         ctk.CTkLabel(popup, text="Your Sync Key",
-                     font=("Helvetica", 16, "bold"),
+                     font=("Nunito", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         ctk.CTkLabel(popup, text="Save this key securely to import on other devices.",
                      text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
@@ -384,7 +401,7 @@ class PasswordManager(ctk.CTk):
         popup.protocol("WM_DELETE_WINDOW", on_close)
 
         ctk.CTkLabel(popup, text="Black Hole — Master Password",
-                     font=("Helvetica", 16, "bold"),
+                     font=("Nunito", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         ctk.CTkLabel(popup, text="Create a master password for your vault",
                      text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
@@ -511,7 +528,7 @@ class PasswordManager(ctk.CTk):
         popup.protocol("WM_DELETE_WINDOW", on_close)
 
         ctk.CTkLabel(popup, text="Black Hole — Master Password",
-                     font=("Helvetica", 16, "bold"),
+                     font=("Nunito", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         ctk.CTkLabel(popup, text="Enter your master password to unlock",
                      text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
@@ -625,7 +642,7 @@ class PasswordManager(ctk.CTk):
         popup.protocol("WM_DELETE_WINDOW", on_close)
 
         ctk.CTkLabel(popup, text="Verify Master Password",
-                     font=("Helvetica", 16, "bold"),
+                     font=("Nunito", 16, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         ctk.CTkLabel(popup, text="Enter your master password to proceed",
                      text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
@@ -761,7 +778,7 @@ class PasswordManager(ctk.CTk):
         search_frame.pack(side="left", fill="x", expand=True)
         search_subframe = ctk.CTkFrame(search_frame, fg_color=BG)
         search_subframe.pack(pady=16, padx=20, fill="x")
-        search_label = ctk.CTkLabel(search_subframe, text="🔍 Search", font=("Helvetica", 12), text_color=TEXT)
+        search_label = ctk.CTkLabel(search_subframe, text="🔍 Search", font=("Nunito", 12), text_color=TEXT)
         search_label.pack(side="left", padx=(0, 5))
         self.search_var = StringVar()
         self.search_entry = ctk.CTkEntry(search_subframe, textvariable=self.search_var, placeholder_text="by title")
@@ -771,7 +788,7 @@ class PasswordManager(ctk.CTk):
         # Sort options
         sort_frame = ctk.CTkFrame(header, fg_color=BG)
         sort_frame.pack(side="right", padx=12)
-        ctk.CTkLabel(sort_frame, text="Sort:", font=("Helvetica", 12), text_color=TEXT, fg_color=BG).pack(side="left", padx=4)
+        ctk.CTkLabel(sort_frame, text="Sort:", font=("Nunito", 12), text_color=TEXT, fg_color=BG).pack(side="left", padx=4)
 
         sort_values = ["Default", "Title A-Z", "Title Z-A", "Custom"]
         display_mode = {
@@ -781,19 +798,19 @@ class PasswordManager(ctk.CTk):
             "custom": "Custom"
         }.get(self.order_mode, "Default")
         self.sort_var = StringVar(value=display_mode)
-        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Helvetica", 12), command=self._change_sort)
+        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Nunito", 12), command=self._change_sort)
         self.sort_combo.pack(side="left", padx=4)
 
         if self.order_mode == "custom":
             self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
-                                                fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12))
+                                                fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12))
             self.edit_order_btn.pack(side="left", padx=4)
 
-        ctk.CTkButton(header, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=80, font=("Nunito", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
         ctk.CTkButton(header, text="Add New", command=self.create_new_card,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12)).pack(side="right", padx=4)
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
 
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
@@ -816,7 +833,7 @@ class PasswordManager(ctk.CTk):
             if not hasattr(self, "edit_order_btn"):
                 sort_frame = self.sort_combo.master
                 self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
-                                                    fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Helvetica", 12))
+                                                    fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12))
                 self.edit_order_btn.pack(side="left", padx=4)
         else:
             if hasattr(self, "edit_order_btn"):
@@ -903,14 +920,14 @@ class PasswordManager(ctk.CTk):
             left = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
             left.pack(side="left", fill="both", expand=True, padx=4, pady=4)
             title_label = ctk.CTkLabel(left, text=title or "(No title)", anchor="w",
-                        font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=CARD, width=50, wraplength=200)  # Increased font size
+                        font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=CARD, width=50, wraplength=200)  # Increased font size
             title_label.pack(anchor="w")
             user_label = ctk.CTkLabel(left, text=f"User: {user or ''}", anchor="w",
-                        text_color=ACCENT_DIM, fg_color=CARD, font=("Helvetica", 12), width=50, wraplength=200)  # Increased font size
+                        text_color=ACCENT_DIM, fg_color=CARD, font=("Nunito", 12), width=50, wraplength=200)  # Increased font size
             user_label.pack(anchor="w")
 
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
-            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Helvetica", 12), width=50, wraplength=200)  # Increased font size
+            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Nunito", 12), width=50, wraplength=200)  # Increased font size
             pwd_label.pack(anchor="w")
 
             def copy_text(text, msg="Copied to clipboard!"):
@@ -931,16 +948,16 @@ class PasswordManager(ctk.CTk):
             def toggle_show(pw=pwd, var=pwd_var):
                 var.set(pw if var.get().startswith("*") else "*"*len(pw))
             ctk.CTkButton(right, text="Show", command=toggle_show,
-                        width=60, fg_color=ACCENT, text_color=BG, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
+                        width=60, fg_color=ACCENT, text_color=BG, font=("Nunito", 10)).pack(pady=2)  # Increased font size
 
-            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Helvetica", 10)).pack(pady=2)  # Increased font size
+            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Nunito", 10)).pack(pady=2)  # Increased font size
 
             def show_notes(n=notes):
                 messagebox.showinfo("Notes", n or "No notes")
-            ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Helvetica", 10)).pack(pady=2)  # Added Notes button
+            ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Nunito", 10)).pack(pady=2)  # Added Notes button
 
             ctk.CTkButton(righter, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
-                        fg_color="#7a2d2d", font=("Helvetica", 10)).pack(pady=2)  # Increased font size
+                        fg_color="#7a2d2d", font=("Nunito", 10)).pack(pady=2)  # Increased font size
 
     # --- Create Card ---
     def create_new_card(self):
@@ -955,7 +972,7 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
-        ctk.CTkLabel(popup, text="Create New Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG, justify="center").pack(pady=(12,6))
+        ctk.CTkLabel(popup, text="Create New Entry", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG, justify="center").pack(pady=(12,6))
         title_var = StringVar()
         title_entry = ctk.CTkEntry(popup, placeholder_text="Title (required)", textvariable=title_var, width=320)
         title_entry.pack(pady=8)
@@ -1005,7 +1022,7 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
-        ctk.CTkLabel(popup, text="Edit Entry", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
+        ctk.CTkLabel(popup, text="Edit Entry", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
 
         ctk.CTkLabel(popup, text="Title", text_color=ACCENT_DIM, fg_color=BG).pack(anchor="w", padx=20)
         title_var = StringVar(value=title)
@@ -1108,12 +1125,12 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
-        ctk.CTkLabel(popup, text="Reorder Entries", font=("Helvetica", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+        ctk.CTkLabel(popup, text="Reorder Entries", font=("Nunito", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
 
         frame = ctk.CTkFrame(popup, fg_color=BG)
         frame.pack(padx=20, pady=10, fill="both", expand=True)
 
-        lb = Listbox(frame, bg=CARD, fg=TEXT, selectbackground=ACCENT, selectforeground=BG, font=("Helvetica", 12), height=15, width=40)
+        lb = Listbox(frame, bg=CARD, fg=TEXT, selectbackground=ACCENT, selectforeground=BG, font=("Nunito", 12), height=15, width=40)
         lb.pack(side="left", fill="both", expand=True)
 
         scroll = ctk.CTkScrollbar(frame, command=lb.yview)
@@ -1192,7 +1209,7 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
-        ctk.CTkLabel(popup, text="Export Passwords", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
+        ctk.CTkLabel(popup, text="Export Passwords", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
         ctk.CTkLabel(popup, text="Choose export format:", text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
 
         btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
@@ -1281,7 +1298,7 @@ class PasswordManager(ctk.CTk):
         nf_label = ctk.CTkLabel(popup, image=nf_ctk_image, text="")
         nf_label.pack(pady=(0, 12))
 
-        ctk.CTkLabel(popup, text="Black Hole Password Manager", font=("Helvetica", 16, "bold"),
+        ctk.CTkLabel(popup, text="Black Hole Password Manager", font=("Nunito", 16, "bold"),
                     text_color=TEXT, fg_color=BG).pack(pady=(12, 6))
         ctk.CTkLabel(popup, text=f"Version {VERSION}\n\n",
                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0, 12))
@@ -1304,7 +1321,7 @@ class PasswordManager(ctk.CTk):
         license_box.configure(state="disabled")
         license_box.pack(padx=20, pady=(0, 12))
 
-        support_link = ctk.CTkLabel(popup, text="Support Nova Foundry", font=("Helvetica", 12, "underline"),
+        support_link = ctk.CTkLabel(popup, text="Support Nova Foundry", font=("Nunito", 12, "underline"),
                                     text_color=ACCENT, fg_color=BG, cursor="hand2")
         support_link.pack(pady=(0, 12))
         def open_support_link(event):
@@ -1373,7 +1390,7 @@ class PasswordManager(ctk.CTk):
                     progress_popup.after(250, lambda: progress_popup.iconbitmap(APP_ICON_PATH))
                 except Exception:
                     pass
-            ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Helvetica", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
+            ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
             center_popup(progress_popup)
             download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
             download_bar.pack(pady=(0,12))
