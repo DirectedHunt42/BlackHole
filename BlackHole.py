@@ -757,10 +757,10 @@ class PasswordManager(ctk.CTk):
             col = i % num_columns
             shadow_frame.grid(row=row_num, column=col, padx=10, pady=10, sticky="n")
 
-            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=30, width=360, height=450, border_width=0)
+            card = ctk.CTkFrame(shadow_frame, fg_color=CARD, corner_radius=0, width=360, height=450, border_width=0)
             card.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.96)  # Slight offset for shadow effect
 
-            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=30)
+            image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=0)
             image_frame.pack(fill="x", expand=False)
             if icon_path and os.path.exists(icon_path):
                 try:
