@@ -856,7 +856,6 @@ class PasswordManager(ctk.CTk):
             if icon_path and os.path.exists(icon_path):
                 try:
                     pil_img = Image.open(icon_path)
-                    pil_img = pil_img.resize((350, 350), Image.LANCZOS)
                     ctk_img = ctk.CTkImage(light_image=pil_img, size=(350, 350))
                     image_label = ctk.CTkLabel(image_frame, image=ctk_img, text="")
                     image_label.pack(expand=True, fill="both")
@@ -996,11 +995,15 @@ class PasswordManager(ctk.CTk):
             nonlocal new_icon_path
             file = filedialog.askopenfilename(filetypes=[("Images", "*.png *.jpg *.jpeg *.ico")])
             if file:
-                ext = os.path.splitext(file)[1]
-                dest = os.path.join(stored_icons_path, f"{id_}{ext}")
-                shutil.copy(file, dest)
-                new_icon_path = dest
-                messagebox.showinfo("Uploaded", "Icon uploaded!", parent=popup)
+                try:
+                    pil_img = Image.open(file)
+                    pil_img = pil_img.resize((350, 350), Image.LANCZOS)
+                    dest = os.path.join(stored_icons_path, f"{id_}.png")
+                    pil_img.save(dest, "PNG")
+                    new_icon_path = dest
+                    messagebox.showinfo("Uploaded", "Icon uploaded and resized!", parent=popup)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to process icon: {e}", parent=popup)
 
         ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
 
