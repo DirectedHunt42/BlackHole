@@ -31,7 +31,7 @@ FONT_LIGHT = r"Fonts\Nunito-Light.ttf"
 FONT_ITALIC = r"Fonts\Nunito-Italic.ttf"
 FONT_SEMIBOLD = r"Fonts\Nunito-SemiBold.ttf"
 LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 # Load all the font files for Tkinter (on Windows)
 if sys.platform.startswith("win"):
