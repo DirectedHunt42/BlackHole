@@ -887,7 +887,7 @@ class PasswordManager(ctk.CTk):
         self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
 
         for i, row in enumerate(rows):
-            id_, title, user, pwd_enc, notes, icon_path = row
+            id_, title, user, pwd_enc, notes, _ = row  # Ignore stored icon_path
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
             except Exception:
@@ -905,7 +905,16 @@ class PasswordManager(ctk.CTk):
 
             image_frame = ctk.CTkFrame(card, height=350, fg_color="transparent", corner_radius=0)
             image_frame.pack(fill="x", expand=False)
-            if icon_path and os.path.exists(icon_path):
+
+            # Search for icon by file name
+            icon_path = None
+            for ext in ['.png', '.jpg', '.jpeg']:
+                possible_path = os.path.join(stored_icons_path, f"{id_}{ext}")
+                if os.path.exists(possible_path):
+                    icon_path = possible_path
+                    break
+
+            if icon_path:
                 try:
                     pil_img = Image.open(icon_path)
                     ctk_img = ctk.CTkImage(light_image=pil_img, size=(350, 350))
@@ -1053,8 +1062,18 @@ class PasswordManager(ctk.CTk):
                 try:
                     pil_img = Image.open(file)
                     pil_img = pil_img.resize((350, 350), Image.LANCZOS)
-                    dest = os.path.join(stored_icons_path, f"{id_}.png")
-                    pil_img.save(dest, "PNG")
+                    orig_ext = os.path.splitext(file)[1].lower()
+                    if orig_ext == '.ico':
+                        orig_ext = '.png'
+                    dest = os.path.join(stored_icons_path, f"{id_}{orig_ext}")
+                    format_to_save = 'JPEG' if orig_ext == '.jpg' or orig_ext == '.jpeg' else 'PNG'
+                    pil_img.save(dest, format=format_to_save)
+                    # Remove old icons with different extensions
+                    for other_ext in ['.png', '.jpg', '.jpeg']:
+                        if other_ext != orig_ext:
+                            old_path = os.path.join(stored_icons_path, f"{id_}{other_ext}")
+                            if os.path.exists(old_path):
+                                os.remove(old_path)
                     new_icon_path = dest
                     messagebox.showinfo("Uploaded", "Icon uploaded and resized!", parent=popup)
                 except Exception as e:
@@ -1092,6 +1111,14 @@ class PasswordManager(ctk.CTk):
                     os.remove(row[0])
                 except:
                     pass
+            # Also remove any searched icon files
+            for ext in ['.png', '.jpg', '.jpeg']:
+                possible_path = os.path.join(stored_icons_path, f"{id_}{ext}")
+                if os.path.exists(possible_path):
+                    try:
+                        os.remove(possible_path)
+                    except:
+                        pass
             self.c.execute("DELETE FROM passwords WHERE id=?", (id_,))
             self.conn.commit()
             if self.order_mode == "custom" and id_ in self.custom_order:
@@ -1421,4 +1448,5 @@ class PasswordManager(ctk.CTk):
 # --- Run App ---
 if __name__ == "__main__":
     app = PasswordManager()
+    print("Black Hole Password Manager started.")
     app.mainloop()
