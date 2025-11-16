@@ -23,7 +23,6 @@ from ctypes import *
 from ctypes.wintypes import *
 if sys.platform.startswith("win"):
     import winreg
-
 # Single instance enforcement using mutex
 ERROR_ALREADY_EXISTS = 183
 mutex_name = "Global\\BlackHole_SingleInstance_Mutex"
@@ -33,20 +32,23 @@ if err == ERROR_ALREADY_EXISTS:
     print("Another instance of BlackHole is already running. Exiting.")
     sys.exit(0)
 
-# --- App Icon ---
-APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
-BLACK_HOLE_LOGO = r"Icons\BlackHole_Transparent_Light.png"
-BLACK_HOLE_WIDE_LOGO = r"Icons\BlackHole_Transparent_Wide.png"
-NOVA_FOUNDRY_LOGO = r"Icons\Nova_foundry_wide_transparent.png"
-FONT_REGULAR = r"Fonts\Nunito-Regular.ttf"
-FONT_MEDIUM = r"Fonts\Nunito-Medium.ttf"
-FONT_BOLD = r"Fonts\Nunito-Black.ttf"
-FONT_LIGHT = r"Fonts\Nunito-Light.ttf"
-FONT_ITALIC = r"Fonts\Nunito-Italic.ttf"
-FONT_SEMIBOLD = r"Fonts\Nunito-SemiBold.ttf"
-LICENSE_TEXT = r"LICENSE.txt"
-VERSION = "1.4.1"
+# Set working directory to the script/exe directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+os.chdir(SCRIPT_DIR)
 
+# --- App Icon ---
+APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
+BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
+BLACK_HOLE_WIDE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide.png")
+NOVA_FOUNDRY_LOGO = os.path.join(SCRIPT_DIR, "Icons", "Nova_foundry_wide_transparent.png")
+FONT_REGULAR = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Regular.ttf")
+FONT_MEDIUM = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Medium.ttf")
+FONT_BOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Black.ttf")
+FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
+FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
+FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
+LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
+VERSION = "1.4.1"
 # Load all the font files for Tkinter (on Windows)
 if sys.platform.startswith("win"):
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -56,7 +58,6 @@ if sys.platform.startswith("win"):
     HWND_BROADCAST = 0xFFFF
     WM_FONTCHANGE = 0x001D
     ctypes.windll.user32.SendMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
-
 # --- Paths ---
 local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
 nova_folder = os.path.join(local_appdata, "NovaFoundry")
@@ -66,7 +67,6 @@ os.makedirs(stored_icons_path, exist_ok=True)
 settings_path = os.path.join(nova_folder, "settings.json")
 order_path = os.path.join(nova_folder, "order.json")
 pinned_path = os.path.join(nova_folder, "pinned.json")
-
 # --- Theme (Deep Space Glow) colours ---
 BG = "#05050a"
 CARD = "#0b0b0f"
@@ -74,7 +74,6 @@ CARD_HOVER = "#111327"
 ACCENT = "#47a3ff"
 ACCENT_DIM = "#2b6f9f"
 TEXT = "#e6eef8"
-
 # Windows constants
 if sys.platform.startswith("win"):
     user32 = windll.user32
@@ -123,7 +122,6 @@ if sys.platform.startswith("win"):
     WNDPROC = WINFUNCTYPE(c_longlong, HWND, UINT, WPARAM, LPARAM)
     user32.CallWindowProcA.argtypes = [c_void_p, HWND, UINT, WPARAM, LPARAM]
     user32.CallWindowProcA.restype = c_longlong
-
 # --- Helper: Derive Key from master password ---
 def derive_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -134,7 +132,6 @@ def derive_key(password: str, salt: bytes) -> bytes:
         backend=default_backend()
     )
     return urlsafe_b64encode(kdf.derive(password.encode()))
-
 # --- Helper: Center Popup ---
 def center_popup(popup):
     popup.update_idletasks()
@@ -143,7 +140,6 @@ def center_popup(popup):
     x = (popup.winfo_screenwidth() // 2) - (width // 2)
     y = (popup.winfo_screenheight() // 2) - (height // 2)
     popup.geometry(f"{width}x{height}+{x}+{y}")
-
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
     def __init__(self):
@@ -239,11 +235,10 @@ class PasswordManager(ctk.CTk):
             self.protocol("WM_DELETE_WINDOW", self.on_close)
             self.message_queue = queue.Queue()
             self.after(100, self.process_message_queue)
-            self.add_tray()  # Always add tray to persist
+            self.add_tray() # Always add tray to persist
         # Minimize on start if applicable
         if '--minimize' in sys.argv and self.settings.get("minimize_to_tray", False):
             self.withdraw()
-
     def process_message_queue(self):
         while not self.message_queue.empty():
             msg_type, data = self.message_queue.get()
@@ -255,17 +250,14 @@ class PasswordManager(ctk.CTk):
                 self.remove_tray()
                 self.add_tray()
         self.after(100, self.process_message_queue)
-
     def on_close(self):
         if self.settings.get("minimize_to_tray", False):
             self.withdraw()
         else:
             self.exit_app()
-
     def exit_app(self):
         self.remove_tray()
         self.destroy()
-
     # --- Tray functions ---
     def add_tray(self):
         if not sys.platform.startswith("win") or self.tray_added:
@@ -298,7 +290,6 @@ class PasswordManager(ctk.CTk):
         nid.hIcon = user32.LoadImageA(0, APP_ICON_PATH.encode('utf-8'), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)
         shell32.Shell_NotifyIconA(NIM_ADD, byref(nid))
         self.tray_added = True
-
     def remove_tray(self):
         if not sys.platform.startswith("win") or not self.tray_added:
             return
@@ -309,13 +300,11 @@ class PasswordManager(ctk.CTk):
         shell32.Shell_NotifyIconA(NIM_DELETE, byref(nid))
         user32.SetWindowLongPtrA(self.hwnd, -4, self.original_wndproc)
         self.tray_added = False
-
     def handle_tray_msg(self, lparam):
         if lparam == WM_LBUTTONDBLCLK:
             self.restore_from_tray()
         elif lparam == WM_RBUTTONDOWN:
             self.show_tray_menu()
-
     def handle_menu_cmd(self, cmd):
         if cmd == 1001:
             self.restore_from_tray()
@@ -324,7 +313,6 @@ class PasswordManager(ctk.CTk):
         elif cmd >= 2000 and cmd < 2000 + len(self.pinned):
             id_ = self.pinned[cmd - 2000]
             self.copy_pinned(id_)
-
     def show_tray_menu(self):
         menu = user32.CreatePopupMenu()
         pinned_menu = user32.CreatePopupMenu()
@@ -346,7 +334,6 @@ class PasswordManager(ctk.CTk):
         user32.PostMessageA(self.hwnd, 0, 0, 0)
         user32.DestroyMenu(menu)
         user32.DestroyMenu(pinned_menu)
-
     def restore_from_tray(self):
         if not self.authenticated:
             success = self._show_master_password_modal()
@@ -361,7 +348,6 @@ class PasswordManager(ctk.CTk):
         self.after(0, lambda: self.state('zoomed'))
         self.deiconify()
         self.lift()
-
     def copy_pinned(self, id_):
         if self._verify_master_password():
             row = self.c.execute("SELECT title, password FROM passwords WHERE id=?", (id_,)).fetchone()
@@ -372,7 +358,6 @@ class PasswordManager(ctk.CTk):
                     self.clipboard_clear()
                     self.clipboard_append(pwd)
                     self.show_balloon("Copied", "Password copied to clipboard!")
-
     def show_balloon(self, title, msg):
         nid = NOTIFYICONDATA()
         nid.cbSize = sizeof(NOTIFYICONDATA)
@@ -384,7 +369,6 @@ class PasswordManager(ctk.CTk):
         nid.szInfo = msg.encode('utf-8')[:256]
         nid.dwInfoFlags = NIIF_INFO
         shell32.Shell_NotifyIconA(NIM_MODIFY, byref(nid))
-
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
         popup = ctk.CTkToplevel(self)
@@ -429,7 +413,6 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"]
-
     # --- Setup New ---
     def _setup_new(self):
         dir_path = filedialog.askdirectory(title="Select Folder for New Vault")
@@ -450,7 +433,6 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
         return success
-
     # --- Setup Import ---
     def _setup_import(self):
         file_path = filedialog.askopenfilename(title="Select Existing Vault DB", filetypes=[("Database Files", "*.db")])
@@ -488,7 +470,6 @@ class PasswordManager(ctk.CTk):
         except Exception:
             pass
         return True
-
     # --- Sync Key input modal ---
     def _show_sync_key_modal(self):
         popup = ctk.CTkToplevel(self)
@@ -530,7 +511,6 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"]
-
     # --- Sync Key display popup ---
     def _show_sync_key_display_popup(self, sync_key):
         popup = ctk.CTkToplevel(self)
@@ -570,7 +550,6 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
         center_popup(popup)
         self.wait_window(popup)
-
     # --- Master Create modal ---
     def _show_master_create_modal(self):
         popup = ctk.CTkToplevel(self)
@@ -680,7 +659,6 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
-
     # --- Master Unlock modal ---
     def _show_master_unlock_modal(self):
         popup = ctk.CTkToplevel(self)
@@ -772,12 +750,10 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
-
     # --- Auth modal for normal unlock ---
     def _show_master_password_modal(self):
         # This is for normal unlock after setup
         return self._show_master_unlock_modal()
-
     def _verify_master_password(self):
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
@@ -870,7 +846,6 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and verified
-
     # --- Initialize DB ---
     def _init_db(self):
         self.conn = sqlite3.connect(self.db_path)
@@ -890,7 +865,6 @@ class PasswordManager(ctk.CTk):
             if "duplicate column" not in str(e).lower():
                 raise
         self.conn.commit()
-
     # --- Save Order ---
     def _save_order(self):
         data = {
@@ -902,7 +876,6 @@ class PasswordManager(ctk.CTk):
                 json.dump(data, f)
         except Exception:
             pass
-
     # --- Save Pinned ---
     def _save_pinned(self):
         try:
@@ -910,7 +883,6 @@ class PasswordManager(ctk.CTk):
                 json.dump({"pinned": self.pinned}, f)
         except Exception:
             pass
-
     # --- Save Settings ---
     def _save_settings(self):
         try:
@@ -918,7 +890,6 @@ class PasswordManager(ctk.CTk):
                 json.dump(self.settings, f)
         except Exception:
             pass
-
     # --- Build UI ---
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=BG, height=64)
@@ -974,7 +945,6 @@ class PasswordManager(ctk.CTk):
         self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
         self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
         self.check_for_update()
-
     # --- Settings Popup ---
     def show_settings_popup(self):
         if not sys.platform.startswith("win"):
@@ -1008,19 +978,16 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
         ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
         center_popup(popup)
-
     def toggle_launch(self, value):
         self.settings["launch_with_windows"] = bool(value)
         self.toggle_startup(value)
         self._save_settings()
-
     def toggle_tray(self, value):
         self.settings["minimize_to_tray"] = bool(value)
         # Update startup if launch is enabled
         if self.settings.get("launch_with_windows", False):
             self.toggle_startup(True)
         self._save_settings()
-
     def toggle_startup(self, enable):
         if not sys.platform.startswith("win"):
             return
@@ -1045,7 +1012,6 @@ class PasswordManager(ctk.CTk):
                 pass
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to remove from startup: {e}")
-
     def _change_sort(self, event=None):
         val = self.sort_var.get()
         if val == "Title A-Z":
@@ -1068,7 +1034,6 @@ class PasswordManager(ctk.CTk):
             if hasattr(self, "edit_order_btn"):
                 self.edit_order_btn.destroy()
                 del self.edit_order_btn
-
     # --- Load Cards ---
     def load_cards(self):
         for widget in self.cards_frame.winfo_children():
@@ -1173,7 +1138,6 @@ class PasswordManager(ctk.CTk):
             ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Nunito", 10)).pack(pady=2) # Added Notes button
             ctk.CTkButton(righter, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
                         fg_color="#7a2d2d", font=("Nunito", 10)).pack(pady=2) # Increased font size
-
     # --- Create Card ---
     def create_new_card(self):
         popup = ctk.CTkToplevel(self)
@@ -1209,7 +1173,6 @@ class PasswordManager(ctk.CTk):
         title_entry.focus_set()
         popup.bind("<Return>", lambda e: create_card_action())
         center_popup(popup)
-
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
         row = self.c.execute("SELECT title, username, password, notes, icon_path FROM passwords WHERE id=?", (id_,)).fetchone()
@@ -1303,7 +1266,6 @@ class PasswordManager(ctk.CTk):
         popup.bind("<Control-s>", lambda e: save_card())
         popup.bind("<Return>", lambda e: save_card())
         center_popup(popup)
-
     # --- Delete ---
     def delete_card(self, id_):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
@@ -1330,7 +1292,6 @@ class PasswordManager(ctk.CTk):
                 self.pinned.remove(id_)
                 self._save_pinned()
             self.load_cards()
-
     # --- Custom Order Popup ---
     def edit_custom_order(self):
         # Update custom_order with current entries
@@ -1412,7 +1373,6 @@ class PasswordManager(ctk.CTk):
         popup.bind("<Control-s>", lambda e: save_reorder())
         popup.bind("<Return>", lambda e: save_reorder())
         center_popup(popup)
-
     # --- Export ---
     def export_popup(self):
         popup = ctk.CTkToplevel(self)
@@ -1435,7 +1395,6 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
         center_popup(popup)
         self.wait_window(popup)
-
     def export_docx(self):
         if not self._verify_master_password():
             return
@@ -1455,7 +1414,6 @@ class PasswordManager(ctk.CTk):
         if path:
             doc.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
-
     def export_odt(self):
         if not self._verify_master_password():
             return
@@ -1473,7 +1431,6 @@ class PasswordManager(ctk.CTk):
         if path:
             odt.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
-
     #--- About Popup ---
     def show_about(self):
         popup = ctk.CTkToplevel(self)
@@ -1518,14 +1475,14 @@ class PasswordManager(ctk.CTk):
         except Exception as e:
             print(f"Error loading license file: {e}")
             license_content = "Could not load license information."
-      
+     
         license_box = ctk.CTkTextbox(popup,
                                     width=480,
                                     height=250,
                                     text_color=TEXT,
                                     fg_color=BG,
                                     wrap="word")
-      
+     
         license_box.insert("1.0", license_content)
         license_box.configure(state="disabled")
         license_box.pack(padx=20, pady=(0, 12))
@@ -1539,7 +1496,6 @@ class PasswordManager(ctk.CTk):
                     fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0, 12))
         center_popup(popup)
         self.wait_window(popup)
-
     def reset_app(self):
         if not messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the app? This will delete settings and stored icons, but not the database."):
             return
@@ -1550,7 +1506,6 @@ class PasswordManager(ctk.CTk):
         messagebox.showinfo("Reset Complete", "App reset. Restart the application.")
         self.destroy()
         sys.exit()
-
     def check_for_update(self):
         q = queue.Queue()
         def check_task():
@@ -1572,7 +1527,6 @@ class PasswordManager(ctk.CTk):
                 pass
             self.after(100, process_queue)
         self.after(100, process_queue)
-
     def do_update_confirm(self, data):
         try:
             title = data.get('name', '').strip()
@@ -1590,7 +1544,6 @@ class PasswordManager(ctk.CTk):
                     self.download_and_install(data)
         except Exception as e:
             print(f"Update check failed: {e}")
-
     def download_and_install(self, data):
         progress_popup = ctk.CTkToplevel(self)
         progress_popup.grab_set()
@@ -1629,7 +1582,6 @@ class PasswordManager(ctk.CTk):
             download_bar.stop()
             progress_popup.destroy()
             messagebox.showerror("Error", f"Failed to download update: {str(e)}")
-
 # --- Run App ---
 if __name__ == "__main__":
     app = PasswordManager()
