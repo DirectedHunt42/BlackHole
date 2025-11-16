@@ -70,12 +70,26 @@ if sys.platform.startswith("win"):
     WNDPROC = WINFUNCTYPE(c_longlong, HWND, UINT, WPARAM, LPARAM)
     user32.CallWindowProcA.argtypes = [c_void_p, HWND, UINT, WPARAM, LPARAM]
     user32.CallWindowProcA.restype = c_longlong
-
     # Added argtypes/restype for single-instance handling
     user32.FindWindowW.argtypes = [c_wchar_p, c_wchar_p]
     user32.FindWindowW.restype = HWND
     user32.PostMessageW.argtypes = [HWND, UINT, WPARAM, LPARAM]
     user32.PostMessageW.restype = BOOL
+    # Definitions for missing types moved here before usage
+    class SECURITY_ATTRIBUTES(Structure):
+        _fields_ = [
+            ("nLength", DWORD),
+            ("lpSecurityDescriptor", LPVOID),
+            ("bInheritHandle", BOOL),
+        ]
+    LPSECURITY_ATTRIBUTES = POINTER(SECURITY_ATTRIBUTES)
+    UINT_PTR = c_ulonglong
+    HMENU = c_void_p
+    LPVOID = c_void_p
+    HINSTANCE = c_void_p
+    HICON = c_void_p
+    HANDLE = c_void_p
+    BOOL = c_int
     kernel32.CreateMutexW.argtypes = [LPSECURITY_ATTRIBUTES, BOOL, c_wchar_p]
     kernel32.CreateMutexW.restype = HANDLE
     kernel32.GetLastError.argtypes = []
@@ -104,23 +118,6 @@ if sys.platform.startswith("win"):
     user32.PostMessageA.restype = BOOL
     user32.DestroyMenu.argtypes = [HMENU]
     user32.DestroyMenu.restype = BOOL
-
-    # Definitions for missing types
-    class SECURITY_ATTRIBUTES(Structure):
-        _fields_ = [
-            ("nLength", DWORD),
-            ("lpSecurityDescriptor", LPVOID),
-            ("bInheritHandle", BOOL),
-        ]
-    LPSECURITY_ATTRIBUTES = POINTER(SECURITY_ATTRIBUTES)
-    UINT_PTR = c_ulonglong
-    HMENU = c_void_p
-    LPVOID = c_void_p
-    HINSTANCE = c_void_p
-    HICON = c_void_p
-    HANDLE = c_void_p
-    BOOL = c_int
-
 # Single instance enforcement using mutex
 if sys.platform.startswith("win"):
     ERROR_ALREADY_EXISTS = 183
@@ -181,7 +178,6 @@ class Tooltip:
         self.tooltip = None
         self.widget.bind("<Enter>", self.show_tooltip)
         self.widget.bind("<Leave>", self.hide_tooltip)
-
     def show_tooltip(self, event):
         x = event.x_root + 20
         y = event.y_root + 20
@@ -190,7 +186,6 @@ class Tooltip:
         self.tooltip.wm_geometry(f"+{x}+{y}")
         label = ctk.CTkLabel(self.tooltip, text=self.text, corner_radius=8, fg_color=CARD, text_color=TEXT, padx=10, pady=5)
         label.pack()
-
     def hide_tooltip(self, event):
         if self.tooltip:
             self.tooltip.destroy()
@@ -352,7 +347,7 @@ class PasswordManager(ctk.CTk):
             return user32.CallWindowProcA(c_void_p(self.original_wndproc), hwnd, msg, wparam, lparam)
         self.new_wndproc_ptr = WNDPROC(new_wndproc)
         self.original_wndproc = user32.GetWindowLongPtrA(self.hwnd, -4)
-        user32.SetWindowLongPtrA(self.hwnd, -4, self.new_wndproc_ptr)
+        user32.SetWindowLongPtrA(self.hwnd, -4, c_longlong(cast(self.new_wndproc_ptr, c_void_p).value))
         nid = NOTIFYICONDATA()
         nid.cbSize = sizeof(NOTIFYICONDATA)
         nid.hWnd = self.hwnd
@@ -1022,7 +1017,7 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         import_btn.pack(side="right", padx=4)
         Tooltip(import_btn, "Import from Spreadsheet")
-        about_btn = ctk.CTkButton(header, text="ℹ️", command=self.show_about_popup,
+        about_btn = ctk.CTkButton(header, text="ℹ️", command=self.show_about,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         about_btn.pack(side="right", padx=4)
         Tooltip(about_btn, "About")
@@ -1489,7 +1484,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkLabel(popup, text="Reorder Entries", font=("Nunito", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         frame = ctk.CTkFrame(popup, fg_color=BG)
         frame.pack(padx=20, pady=10, fill="both", expand=True)
-        lb = Listbox(frame, bg=CARD, fg=TEXT, selectbackground=ACCENT, selectforeground=BG, font=("Nunito", 12), height=15, width=40)
+        lb = Listbox(frame, bg=CARD, fg=TEXT, selectbackground=ACCENT, font=("Nunito", 12), height=15, width=40)
         lb.pack(side="left", fill="both", expand=True)
         scroll = ctk.CTkScrollbar(frame, command=lb.yview)
         scroll.pack(side="right", fill="y")
@@ -1646,14 +1641,12 @@ class PasswordManager(ctk.CTk):
         except Exception as e:
             print(f"Error loading license file: {e}")
             license_content = "Could not load license information."
-  
         license_box = ctk.CTkTextbox(popup,
                                     width=480,
                                     height=250,
                                     text_color=TEXT,
                                     fg_color=BG,
                                     wrap="word")
-  
         license_box.insert("1.0", license_content)
         license_box.configure(state="disabled")
         license_box.pack(padx=20, pady=(0, 12))
