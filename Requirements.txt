@@ -4,3 +4,4 @@ python-docx
 odfpy
 pyperclip
 pillow
+pywin32

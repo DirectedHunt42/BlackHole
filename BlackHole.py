@@ -18,6 +18,20 @@ from odf.text import P
 from PIL import Image, ImageTk
 import urllib
 import ctypes
+from win32event import CreateMutex
+from win32api import GetLastError
+from winerror import ERROR_ALREADY_EXISTS
+import win32gui
+import win32api
+import argparse
+import win32con
+
+# Single-instance enforcement
+mutex_name = 'BlackHole_SingleInstance_Mutex'
+handle = CreateMutex(None, False, mutex_name)
+if GetLastError() == ERROR_ALREADY_EXISTS:
+    print("Another instance of BlackHole is already running. Exiting.")
+    sys.exit(0)
 
 # --- App Icon ---
 APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
@@ -81,10 +95,80 @@ def center_popup(popup):
     y = (popup.winfo_screenheight() // 2) - (height // 2)
     popup.geometry(f"{width}x{height}+{x}+{y}")
 
+# --- Tray Icon Class ---
+class TrayIcon:
+    def __init__(self, app):
+        self.app = app
+        self.hinst = win32api.GetModuleHandle(None)
+        self.window_class = 'BlackHoleTrayWindow'
+        wc = win32gui.WNDCLASS()
+        wc.hInstance = self.hinst
+        wc.lpszClassName = self.window_class
+        wc.lpfnWndProc = self.wnd_proc
+        self.class_atom = win32gui.RegisterClass(wc)
+        self.hwnd = win32gui.CreateWindow(self.class_atom, self.window_class, 0, 0, 0, 0, 0, 0, 0, self.hinst, None)
+        win32gui.UpdateWindow(self.hwnd)
+        self.menu_id_show = 1001
+        self.menu_id_exit = 1002
+        self.add_tray_icon()
+
+    def add_tray_icon(self):
+        icon_flags = win32con.NIF_ICON | win32con.NIF_MESSAGE | win32con.NIF_TIP
+        hicon = win32gui.LoadIcon(0, win32con.IDI_APPLICATION)  # Fallback
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                hicon = win32gui.LoadImage(self.hinst, APP_ICON_PATH, win32con.IMAGE_ICON, 0, 0, win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE)
+            except:
+                pass
+        nid = (self.hwnd, 0, icon_flags, win32con.WM_USER + 20, hicon, 'Black Hole Password Manager')
+        win32gui.Shell_NotifyIcon(win32con.NIM_ADD, nid)
+
+    def wnd_proc(self, hwnd, msg, wparam, lparam):
+        if msg == win32con.WM_COMMAND:
+            if wparam == self.menu_id_show:
+                self.show_app()
+            elif wparam == self.menu_id_exit:
+                self.exit_app()
+        elif msg == win32con.WM_USER + 20:
+            if lparam == win32con.WM_LBUTTONUP:
+                self.show_app()
+            elif lparam == win32con.WM_RBUTTONUP:
+                self.show_menu()
+        return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
+
+    def show_menu(self):
+        menu = win32gui.CreatePopupMenu()
+        win32gui.AppendMenu(menu, win32con.MF_STRING, self.menu_id_show, "Show")
+        win32gui.AppendMenu(menu, win32con.MF_STRING, self.menu_id_exit, "Exit")
+        pos = win32gui.GetCursorPos()
+        win32gui.SetForegroundWindow(self.hwnd)
+        win32gui.TrackPopupMenu(menu, win32con.TPM_LEFTALIGN, pos[0], pos[1], 0, self.hwnd, None)
+        win32gui.PostMessage(self.hwnd, win32con.WM_NULL, 0, 0)
+
+    def show_app(self):
+        if not self.app.authenticated:
+            self.app.do_auth_and_show()
+        else:
+            self.app.deiconify()
+            self.app.attributes('-alpha', 1.0)
+            self.app.lift()
+            self.app.after(0, lambda: self.app.state('zoomed'))
+
+    def exit_app(self):
+        win32gui.Shell_NotifyIcon(win32con.NIM_DELETE, (self.hwnd, 0))
+        win32gui.PostMessage(self.hwnd, win32con.WM_QUIT, 0, 0)
+        self.app.destroy()
+
+    def run(self):
+        win32gui.PumpMessages()
+
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
-    def __init__(self):
+    def __init__(self, minimized_start=False):
         super().__init__()
+
+        self.minimized_start = minimized_start
+        self.authenticated = False
 
         ctk.set_appearance_mode("dark")
         try:
@@ -135,6 +219,30 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
+        self.configure(fg_color=BG)
+
+        # Always create tray on Windows
+        if sys.platform.startswith('win'):
+            self.tray_thread = threading.Thread(target=self.run_tray, daemon=True)
+            self.tray_thread.start()
+
+        # Auth and show if not minimized
+        if not self.minimized_start:
+            self.do_auth_and_show()
+        else:
+            self.withdraw()
+
+        # Keyboard bindings for main window (after build)
+        self.bind("<Control-f>", lambda e: self.search_entry.focus() if hasattr(self, 'search_entry') else None)
+        self.bind("<Control-s>", lambda e: self.export_popup() if hasattr(self, 'export_popup') else None)
+        self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units") if hasattr(self, 'cards_frame') else None)
+        self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units") if hasattr(self, 'cards_frame') else None)
+
+    def run_tray(self):
+        self.tray = TrayIcon(self)
+        self.tray.run()
+
+    def do_auth_and_show(self):
         # Check if setup is needed
         if not self.settings.get("master_password_set", False) or not self.db_path:
             success = self._show_setup_modal()
@@ -147,17 +255,15 @@ class PasswordManager(ctk.CTk):
             sys.exit()
 
         # Build UI after successful auth
-        self.configure(fg_color=BG)
         self._build_ui()
+        self.deiconify()
         self.attributes('-alpha', 1.0)
         self.after(0, lambda: self.state('zoomed'))
         self.load_cards()
+        self.authenticated = True
 
-        # Keyboard bindings for main window
-        self.bind("<Control-f>", lambda e: self.search_entry.focus())
-        self.bind("<Control-s>", lambda e: self.export_popup())
-        self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
-        self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
+    def hide_to_tray(self):
+        self.withdraw()
 
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
@@ -814,6 +920,12 @@ class PasswordManager(ctk.CTk):
 
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
+
+        # Tray-related bindings
+        if sys.platform.startswith('win'):
+            self.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
+            self.bind("<Unmap>", lambda e: self.hide_to_tray() if self.state() == 'iconic' else None)
+
         self.check_for_update()
 
     def _change_sort(self, event=None):
@@ -1447,6 +1559,9 @@ class PasswordManager(ctk.CTk):
 
 # --- Run App ---
 if __name__ == "__main__":
-    app = PasswordManager()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--minimized', action='store_true', help="Start minimized to tray")
+    args = parser.parse_args()
+    app = PasswordManager(minimized_start=args.minimized)
     print("Black Hole Password Manager started.")
     app.mainloop()
