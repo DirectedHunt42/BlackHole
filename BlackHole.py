@@ -19,6 +19,7 @@ from PIL import Image, ImageTk
 import urllib
 import ctypes
 import queue
+import pandas as pd
 from ctypes import *
 from ctypes.wintypes import *
 if sys.platform.startswith("win"):
@@ -29,13 +30,13 @@ mutex_name = "Global\\BlackHole_SingleInstance_Mutex"
 mutex = windll.kernel32.CreateMutexW(None, True, mutex_name)
 err = windll.kernel32.GetLastError()
 if err == ERROR_ALREADY_EXISTS:
-    print("Another instance of BlackHole is already running. Exiting.")
+    hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
+    if hwnd:
+        user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
     sys.exit(0)
-
 # Set working directory to the script/exe directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 os.chdir(SCRIPT_DIR)
-
 # --- App Icon ---
 APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
 BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
@@ -48,7 +49,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 # Load all the font files for Tkinter (on Windows)
 if sys.platform.startswith("win"):
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -937,6 +938,8 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(header, text="⚙️", command=self.show_settings_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12)).pack(side="right", padx=4)
         ctk.CTkButton(header, text="Add New", command=self.create_new_card,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="Import Spreadsheet", command=self.import_spreadsheet,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120, font=("Nunito", 12)).pack(side="right", padx=4)
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Keyboard bindings for main window
@@ -945,6 +948,88 @@ class PasswordManager(ctk.CTk):
         self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
         self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
         self.check_for_update()
+    def import_spreadsheet(self):
+        file_path = filedialog.askopenfilename(title="Select Spreadsheet", filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv")])
+        if not file_path:
+            return
+        ext = os.path.splitext(file_path)[1].lower()
+        try:
+            if ext == '.xlsx':
+                df = pd.read_excel(file_path)
+            elif ext == '.csv':
+                df = pd.read_csv(file_path)
+            else:
+                messagebox.showerror("Error", "Unsupported file type")
+                return
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read file: {e}")
+            return
+        columns = list(df.columns)
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.title("Map Columns")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
+        ctk.CTkLabel(popup, text="Map Spreadsheet Columns", font=("Nunito", 16, "bold"), text_color=TEXT).pack(pady=(16,6))
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both")
+        # Title
+        ctk.CTkLabel(frame, text="Title (required):", text_color=TEXT).pack(anchor="w", padx=12, pady=(12,0))
+        title_var = StringVar()
+        title_combo = ctk.CTkComboBox(frame, values=columns, variable=title_var, width=360)
+        title_combo.pack(padx=12, pady=(0,6))
+        # Username
+        ctk.CTkLabel(frame, text="Username:", text_color=TEXT).pack(anchor="w", padx=12, pady=(6,0))
+        user_var = StringVar(value="None")
+        user_combo = ctk.CTkComboBox(frame, values=["None"] + columns, variable=user_var, width=360)
+        user_combo.pack(padx=12, pady=(0,6))
+        # Password
+        ctk.CTkLabel(frame, text="Password:", text_color=TEXT).pack(anchor="w", padx=12, pady=(6,0))
+        pwd_var = StringVar(value="None")
+        pwd_combo = ctk.CTkComboBox(frame, values=["None"] + columns, variable=pwd_var, width=360)
+        pwd_combo.pack(padx=12, pady=(0,6))
+        # Notes
+        ctk.CTkLabel(frame, text="Notes:", text_color=TEXT).pack(anchor="w", padx=12, pady=(6,0))
+        notes_var = StringVar(value="None")
+        notes_combo = ctk.CTkComboBox(frame, values=["None"] + columns, variable=notes_var, width=360)
+        notes_combo.pack(padx=12, pady=(0,12))
+        def do_import():
+            title_col = title_var.get()
+            if not title_col:
+                messagebox.showerror("Error", "Title column required!", parent=popup)
+                return
+            user_col = user_var.get() if user_var.get() != "None" else None
+            pwd_col = pwd_var.get() if pwd_var.get() != "None" else None
+            notes_col = notes_var.get() if notes_var.get() != "None" else None
+            count = 0
+            new_ids = []
+            for _, row in df.iterrows():
+                title = row[title_col] if title_col in row else ""
+                if pd.isna(title) or not str(title).strip():
+                    continue
+                user = row[user_col] if user_col and user_col in row else ""
+                pwd = row[pwd_col] if pwd_col and pwd_col in row else ""
+                notes = row[notes_col] if notes_col and notes_col in row else ""
+                enc_pwd = self.fernet.encrypt(str(pwd).encode()).decode() if pwd else ""
+                self.c.execute("INSERT INTO passwords (title, username, password, notes, icon_path) VALUES (?, ?, ?, ?, ?)",
+                               (str(title), str(user), enc_pwd, str(notes), ""))
+                self.conn.commit()
+                count += 1
+                if self.order_mode == "custom":
+                    new_ids.append(self.c.lastrowid)
+            if self.order_mode == "custom" and new_ids:
+                self.custom_order.extend(new_ids)
+                self._save_order()
+            popup.destroy()
+            self.load_cards()
+            messagebox.showinfo("Imported", f"Imported {count} entries successfully.")
+        ctk.CTkButton(popup, text="Import", command=do_import, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,12))
+        center_popup(popup)
     # --- Settings Popup ---
     def show_settings_popup(self):
         if not sys.platform.startswith("win"):
@@ -1475,14 +1560,14 @@ class PasswordManager(ctk.CTk):
         except Exception as e:
             print(f"Error loading license file: {e}")
             license_content = "Could not load license information."
-     
+    
         license_box = ctk.CTkTextbox(popup,
                                     width=480,
                                     height=250,
                                     text_color=TEXT,
                                     fg_color=BG,
                                     wrap="word")
-     
+    
         license_box.insert("1.0", license_content)
         license_box.configure(state="disabled")
         license_box.pack(padx=20, pady=(0, 12))

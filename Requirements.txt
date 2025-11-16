@@ -5,3 +5,4 @@ odfpy
 pyperclip
 pillow
 pywin32
+pandas
