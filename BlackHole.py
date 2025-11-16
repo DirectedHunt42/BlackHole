@@ -24,59 +24,6 @@ from ctypes import *
 from ctypes.wintypes import *
 if sys.platform.startswith("win"):
     import winreg
-# Single instance enforcement using mutex
-ERROR_ALREADY_EXISTS = 183
-mutex_name = "Global\\BlackHole_SingleInstance_Mutex"
-mutex = windll.kernel32.CreateMutexW(None, True, mutex_name)
-err = windll.kernel32.GetLastError()
-if err == ERROR_ALREADY_EXISTS:
-    hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
-    if hwnd:
-        user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
-    sys.exit(0)
-# Set working directory to the script/exe directory
-SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
-os.chdir(SCRIPT_DIR)
-# --- App Icon ---
-APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
-BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
-BLACK_HOLE_WIDE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide.png")
-NOVA_FOUNDRY_LOGO = os.path.join(SCRIPT_DIR, "Icons", "Nova_foundry_wide_transparent.png")
-FONT_REGULAR = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Regular.ttf")
-FONT_MEDIUM = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Medium.ttf")
-FONT_BOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Black.ttf")
-FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
-FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
-FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
-LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.5.0"
-# Load all the font files for Tkinter (on Windows)
-if sys.platform.startswith("win"):
-    fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
-    for font_path in fonts:
-        ctypes.windll.gdi32.AddFontResourceA(font_path.encode('utf-8'))
-    # Broadcast font change
-    HWND_BROADCAST = 0xFFFF
-    WM_FONTCHANGE = 0x001D
-    ctypes.windll.user32.SendMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
-# --- Paths ---
-local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
-nova_folder = os.path.join(local_appdata, "NovaFoundry")
-os.makedirs(nova_folder, exist_ok=True)
-stored_icons_path = os.path.join(nova_folder, "StoredIcons")
-os.makedirs(stored_icons_path, exist_ok=True)
-settings_path = os.path.join(nova_folder, "settings.json")
-order_path = os.path.join(nova_folder, "order.json")
-pinned_path = os.path.join(nova_folder, "pinned.json")
-# --- Theme (Deep Space Glow) colours ---
-BG = "#05050a"
-CARD = "#0b0b0f"
-CARD_HOVER = "#111327"
-ACCENT = "#47a3ff"
-ACCENT_DIM = "#2b6f9f"
-TEXT = "#e6eef8"
-# Windows constants
-if sys.platform.startswith("win"):
     user32 = windll.user32
     shell32 = windll.shell32
     kernel32 = windll.kernel32
@@ -123,6 +70,58 @@ if sys.platform.startswith("win"):
     WNDPROC = WINFUNCTYPE(c_longlong, HWND, UINT, WPARAM, LPARAM)
     user32.CallWindowProcA.argtypes = [c_void_p, HWND, UINT, WPARAM, LPARAM]
     user32.CallWindowProcA.restype = c_longlong
+# Single instance enforcement using mutex
+if sys.platform.startswith("win"):
+    ERROR_ALREADY_EXISTS = 183
+    mutex_name = "Global\\BlackHole_SingleInstance_Mutex"
+    mutex = kernel32.CreateMutexW(None, True, mutex_name)
+    err = kernel32.GetLastError()
+    if err == ERROR_ALREADY_EXISTS:
+        hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
+        if hwnd:
+            user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
+        sys.exit(0)
+# Set working directory to the script/exe directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+os.chdir(SCRIPT_DIR)
+# --- App Icon ---
+APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
+BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
+BLACK_HOLE_WIDE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide.png")
+NOVA_FOUNDRY_LOGO = os.path.join(SCRIPT_DIR, "Icons", "Nova_foundry_wide_transparent.png")
+FONT_REGULAR = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Regular.ttf")
+FONT_MEDIUM = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Medium.ttf")
+FONT_BOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Black.ttf")
+FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
+FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
+FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
+LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
+VERSION = "1.5.0"
+# Load all the font files for Tkinter (on Windows)
+if sys.platform.startswith("win"):
+    fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
+    for font_path in fonts:
+        ctypes.windll.gdi32.AddFontResourceA(font_path.encode('utf-8'))
+    # Broadcast font change
+    HWND_BROADCAST = 0xFFFF
+    WM_FONTCHANGE = 0x001D
+    ctypes.windll.user32.SendMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
+# --- Paths ---
+local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+nova_folder = os.path.join(local_appdata, "NovaFoundry")
+os.makedirs(nova_folder, exist_ok=True)
+stored_icons_path = os.path.join(nova_folder, "StoredIcons")
+os.makedirs(stored_icons_path, exist_ok=True)
+settings_path = os.path.join(nova_folder, "settings.json")
+order_path = os.path.join(nova_folder, "order.json")
+pinned_path = os.path.join(nova_folder, "pinned.json")
+# --- Theme (Deep Space Glow) colours ---
+BG = "#05050a"
+CARD = "#0b0b0f"
+CARD_HOVER = "#111327"
+ACCENT = "#47a3ff"
+ACCENT_DIM = "#2b6f9f"
+TEXT = "#e6eef8"
 # --- Helper: Derive Key from master password ---
 def derive_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -936,10 +935,10 @@ class PasswordManager(ctk.CTk):
                                                 fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12))
             self.edit_order_btn.pack(side="left", padx=4)
         ctk.CTkButton(header, text="⚙️", command=self.show_settings_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="Add New", command=self.create_new_card,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="Import Spreadsheet", command=self.import_spreadsheet,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120, font=("Nunito", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="➕", command=self.create_new_card,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12), ).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="📥", command=self.import_spreadsheet,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12)).pack(side="right", padx=4)
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Keyboard bindings for main window
@@ -965,6 +964,7 @@ class PasswordManager(ctk.CTk):
             messagebox.showerror("Error", f"Failed to read file: {e}")
             return
         columns = list(df.columns)
+        columns = [str(col) for col in columns]
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
         popup.title("Map Columns")

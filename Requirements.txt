@@ -6,3 +6,4 @@ pyperclip
 pillow
 pywin32
 pandas
+openpyxl
