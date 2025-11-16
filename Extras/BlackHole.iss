@@ -3,7 +3,7 @@
 ; Non-commercial use only
 
 #define MyAppName "Black Hole"
-#define MyAppVersion "1.3.2"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "Nova Foundry"
 #define MyAppURL "https://github.com/DirectedHunt42/BlackHole"
 #define MyAppExeName "BlackHole.exe"
@@ -36,7 +36,7 @@ LicenseFile=C:\Users\jackp\Downloads\BlackHole\LICENSE.txt
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=C:\Users\jackp\Downloads
 OutputBaseFilename=Black_hole_setup
-SetupIconFile=E:\Projects\Programming\BlackHole\Extras\Black Hole Installer.ico
+SetupIconFile=C:\Users\jackp\Downloads\Black Hole Installer.ico
 SolidCompression=yes
 WizardStyle=modern dynamic
 
@@ -57,4 +57,3 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-
