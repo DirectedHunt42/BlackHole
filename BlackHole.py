@@ -70,6 +70,57 @@ if sys.platform.startswith("win"):
     WNDPROC = WINFUNCTYPE(c_longlong, HWND, UINT, WPARAM, LPARAM)
     user32.CallWindowProcA.argtypes = [c_void_p, HWND, UINT, WPARAM, LPARAM]
     user32.CallWindowProcA.restype = c_longlong
+
+    # Added argtypes/restype for single-instance handling
+    user32.FindWindowW.argtypes = [c_wchar_p, c_wchar_p]
+    user32.FindWindowW.restype = HWND
+    user32.PostMessageW.argtypes = [HWND, UINT, WPARAM, LPARAM]
+    user32.PostMessageW.restype = BOOL
+    kernel32.CreateMutexW.argtypes = [LPSECURITY_ATTRIBUTES, BOOL, c_wchar_p]
+    kernel32.CreateMutexW.restype = HANDLE
+    kernel32.GetLastError.argtypes = []
+    kernel32.GetLastError.restype = DWORD
+    user32.GetWindowLongPtrA.argtypes = [HWND, c_int]
+    user32.GetWindowLongPtrA.restype = c_longlong
+    user32.SetWindowLongPtrA.argtypes = [HWND, c_int, c_longlong]
+    user32.SetWindowLongPtrA.restype = c_longlong
+    user32.RegisterWindowMessageA.argtypes = [c_char_p]
+    user32.RegisterWindowMessageA.restype = UINT
+    shell32.Shell_NotifyIconA.argtypes = [DWORD, POINTER(NOTIFYICONDATA)]
+    shell32.Shell_NotifyIconA.restype = BOOL
+    user32.LoadImageA.argtypes = [HINSTANCE, c_char_p, UINT, c_int, c_int, UINT]
+    user32.LoadImageA.restype = HANDLE
+    user32.CreatePopupMenu.argtypes = []
+    user32.CreatePopupMenu.restype = HMENU
+    user32.AppendMenuA.argtypes = [HMENU, UINT, UINT_PTR, c_char_p]
+    user32.AppendMenuA.restype = BOOL
+    user32.GetCursorPos.argtypes = [POINTER(POINT)]
+    user32.GetCursorPos.restype = BOOL
+    user32.SetForegroundWindow.argtypes = [HWND]
+    user32.SetForegroundWindow.restype = BOOL
+    user32.TrackPopupMenu.argtypes = [HMENU, UINT, c_int, c_int, c_int, HWND, c_void_p]
+    user32.TrackPopupMenu.restype = BOOL
+    user32.PostMessageA.argtypes = [HWND, UINT, WPARAM, LPARAM]
+    user32.PostMessageA.restype = BOOL
+    user32.DestroyMenu.argtypes = [HMENU]
+    user32.DestroyMenu.restype = BOOL
+
+    # Definitions for missing types
+    class SECURITY_ATTRIBUTES(Structure):
+        _fields_ = [
+            ("nLength", DWORD),
+            ("lpSecurityDescriptor", LPVOID),
+            ("bInheritHandle", BOOL),
+        ]
+    LPSECURITY_ATTRIBUTES = POINTER(SECURITY_ATTRIBUTES)
+    UINT_PTR = c_ulonglong
+    HMENU = c_void_p
+    LPVOID = c_void_p
+    HINSTANCE = c_void_p
+    HICON = c_void_p
+    HANDLE = c_void_p
+    BOOL = c_int
+
 # Single instance enforcement using mutex
 if sys.platform.startswith("win"):
     ERROR_ALREADY_EXISTS = 183
@@ -122,6 +173,28 @@ CARD_HOVER = "#111327"
 ACCENT = "#47a3ff"
 ACCENT_DIM = "#2b6f9f"
 TEXT = "#e6eef8"
+# --- Tooltip Class ---
+class Tooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event):
+        x = event.x_root + 20
+        y = event.y_root + 20
+        self.tooltip = ctk.CTkToplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        label = ctk.CTkLabel(self.tooltip, text=self.text, corner_radius=8, fg_color=CARD, text_color=TEXT, padx=10, pady=5)
+        label.pack()
+
+    def hide_tooltip(self, event):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
 # --- Helper: Derive Key from master password ---
 def derive_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -934,11 +1007,25 @@ class PasswordManager(ctk.CTk):
             self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
                                                 fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12))
             self.edit_order_btn.pack(side="left", padx=4)
-        ctk.CTkButton(header, text="⚙️", command=self.show_settings_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="➕", command=self.create_new_card,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12), ).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="📥", command=self.import_spreadsheet,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12)).pack(side="right", padx=4)
+        settings_btn = ctk.CTkButton(header, text="⚙️", command=self.show_settings_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        settings_btn.pack(side="right", padx=4)
+        Tooltip(settings_btn, "Settings")
+        add_btn = ctk.CTkButton(header, text="➕", command=self.create_new_card,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        add_btn.pack(side="right", padx=4)
+        Tooltip(add_btn, "Add New Entry")
+        export_btn = ctk.CTkButton(header, text="📤", command=self.export_popup,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        export_btn.pack(side="right", padx=4)
+        Tooltip(export_btn, "Export Vault")
+        import_btn = ctk.CTkButton(header, text="📥", command=self.import_spreadsheet,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        import_btn.pack(side="right", padx=4)
+        Tooltip(import_btn, "Import from Spreadsheet")
+        about_btn = ctk.CTkButton(header, text="ℹ️", command=self.show_about_popup,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        about_btn.pack(side="right", padx=4)
+        Tooltip(about_btn, "About")
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Keyboard bindings for main window
@@ -1058,7 +1145,6 @@ class PasswordManager(ctk.CTk):
         if self.settings.get("minimize_to_tray", False):
             tray_var.select()
         tray_var.configure(command=lambda: self.toggle_tray(tray_var.get()))
-        ctk.CTkButton(frame, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
         ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
@@ -1560,14 +1646,14 @@ class PasswordManager(ctk.CTk):
         except Exception as e:
             print(f"Error loading license file: {e}")
             license_content = "Could not load license information."
-    
+  
         license_box = ctk.CTkTextbox(popup,
                                     width=480,
                                     height=250,
                                     text_color=TEXT,
                                     fg_color=BG,
                                     wrap="word")
-    
+  
         license_box.insert("1.0", license_content)
         license_box.configure(state="disabled")
         license_box.pack(padx=20, pady=(0, 12))
