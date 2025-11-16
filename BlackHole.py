@@ -18,6 +18,12 @@ from odf.text import P
 from PIL import Image, ImageTk
 import urllib
 import ctypes
+import queue
+from ctypes import *
+from ctypes.wintypes import *
+
+if sys.platform.startswith("win"):
+    import winreg
 
 # --- App Icon ---
 APP_ICON_PATH = r"Icons\BlackHole_Icon.ico"
@@ -52,6 +58,7 @@ os.makedirs(stored_icons_path, exist_ok=True)
 
 settings_path = os.path.join(nova_folder, "settings.json")
 order_path = os.path.join(nova_folder, "order.json")
+pinned_path = os.path.join(nova_folder, "pinned.json")
 
 # --- Theme (Deep Space Glow) colours ---
 BG = "#05050a"
@@ -60,6 +67,67 @@ CARD_HOVER = "#111327"
 ACCENT = "#47a3ff"
 ACCENT_DIM = "#2b6f9f"
 TEXT = "#e6eef8"
+
+# Windows constants
+if sys.platform.startswith("win"):
+    user32 = windll.user32
+    shell32 = windll.shell32
+    kernel32 = windll.kernel32
+
+    WM_USER = 0x0400
+    WM_COMMAND = 0x0111
+    WM_LBUTTONDBLCLK = 0x0203
+    WM_RBUTTONDOWN = 0x0204
+
+    NIM_ADD = 0
+    NIM_MODIFY = 1
+    NIM_DELETE = 2
+
+    NIF_MESSAGE = 0x00000001
+    NIF_ICON = 0x00000002
+    NIF_TIP = 0x00000004
+    NIF_INFO = 0x00000010
+
+    NIIF_INFO = 0x00000001
+
+    IDI_APPLICATION = 32512
+
+    MF_STRING = 0x00000000
+    MF_POPUP = 0x00000010
+
+    IMAGE_ICON = 1
+    LR_LOADFROMFILE = 0x00000010
+    LR_DEFAULTSIZE = 0x00000040
+
+    class POINT(Structure):
+        _fields_ = [("x", LONG), ("y", LONG)]
+
+    class NOTIFYICONDATA(Structure):
+        _fields_ = [
+            ("cbSize", DWORD),
+            ("hWnd", HWND),
+            ("uID", UINT),
+            ("uFlags", UINT),
+            ("uCallbackMessage", UINT),
+            ("hIcon", HICON),
+            ("szTip", c_char * 64),
+            ("dwState", DWORD),
+            ("dwStateMask", DWORD),
+            ("szInfo", c_char * 256),
+            ("uVersion", UINT),
+            ("szInfoTitle", c_char * 64),
+            ("dwInfoFlags", DWORD),
+        ]
+
+    HWND = c_void_p
+    UINT = c_uint
+    WPARAM = c_ulonglong
+    LPARAM = c_longlong
+
+    WNDPROC = WINFUNCTYPE(c_longlong, HWND, UINT, WPARAM, LPARAM)
+
+    user32.CallWindowProcA.argtypes = [c_void_p, HWND, UINT, WPARAM, LPARAM]
+    user32.CallWindowProcA.restype = c_longlong
 
 # --- Helper: Derive Key from master password ---
 def derive_key(password: str, salt: bytes) -> bytes:
@@ -135,6 +203,15 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
 
+        # load pinned
+        self.pinned = []
+        if os.path.exists(pinned_path):
+            try:
+                with open(pinned_path, "r") as f:
+                    self.pinned = json.load(f).get("pinned", [])
+            except Exception:
+                pass
+
         # Check if setup is needed
         if not self.settings.get("master_password_set", False) or not self.db_path:
             success = self._show_setup_modal()
@@ -158,6 +235,161 @@ class PasswordManager(ctk.CTk):
         self.bind("<Control-s>", lambda e: self.export_popup())
         self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
         self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
+
+        # Tray setup
+        if sys.platform.startswith("win"):
+            self.hwnd = None
+            self.callback_message = None
+            self.new_wndproc_ptr = None
+            self.original_wndproc = None
+            self.msg_taskbar_created = None
+            self.tray_added = False
+            self.protocol("WM_DELETE_WINDOW", self.on_close)
+            self.message_queue = queue.Queue()
+            self.after(100, self.process_message_queue)
+
+        # Minimize on start if applicable
+        if '--minimize' in sys.argv and self.settings.get("minimize_to_tray", False):
+            self.withdraw()
+            self.add_tray()
+
+    def process_message_queue(self):
+        while not self.message_queue.empty():
+            msg_type, data = self.message_queue.get()
+            if msg_type == 'tray_msg':
+                self.handle_tray_msg(data)
+            elif msg_type == 'menu_cmd':
+                self.handle_menu_cmd(data)
+            elif msg_type == 'taskbar_created':
+                self.remove_tray()
+                self.add_tray()
+        self.after(100, self.process_message_queue)
+
+    def on_close(self):
+        if self.settings.get("minimize_to_tray", False):
+            self.withdraw()
+            self.add_tray()
+        else:
+            self.exit_app()
+
+    def exit_app(self):
+        self.remove_tray()
+        self.destroy()
+
+    # --- Tray functions ---
+    def add_tray(self):
+        if not sys.platform.startswith("win") or self.tray_added:
+            return
+        self.hwnd = self.winfo_id()
+        self.msg_taskbar_created = user32.RegisterWindowMessageA(b"TaskbarCreated")
+        self.callback_message = WM_USER + 1
+
+        def new_wndproc(hwnd, msg, wparam, lparam):
+            if msg == self.callback_message:
+                self.message_queue.put(('tray_msg', lparam))
+                return 0
+            elif msg == WM_COMMAND:
+                cmd = wparam & 0xFFFF
+                self.message_queue.put(('menu_cmd', cmd))
+                return 0
+            elif msg == self.msg_taskbar_created:
+                self.message_queue.put(('taskbar_created', None))
+                return 0
+            return user32.CallWindowProcA(c_void_p(self.original_wndproc), hwnd, msg, wparam, lparam)
+
+        self.new_wndproc_ptr = WNDPROC(new_wndproc)
+        self.original_wndproc = user32.GetWindowLongPtrA(self.hwnd, -4)
+        user32.SetWindowLongPtrA(self.hwnd, -4, self.new_wndproc_ptr)
+
+        nid = NOTIFYICONDATA()
+        nid.cbSize = sizeof(NOTIFYICONDATA)
+        nid.hWnd = self.hwnd
+        nid.uID = 99
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP
+        nid.uCallbackMessage = self.callback_message
+        nid.szTip = b"Black Hole Password Manager\0"
+        nid.hIcon = user32.LoadImageA(0, APP_ICON_PATH.encode('utf-8'), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)
+        shell32.Shell_NotifyIconA(NIM_ADD, byref(nid))
+        self.tray_added = True
+
+    def remove_tray(self):
+        if not sys.platform.startswith("win") or not self.tray_added:
+            return
+        nid = NOTIFYICONDATA()
+        nid.cbSize = sizeof(NOTIFYICONDATA)
+        nid.hWnd = self.hwnd
+        nid.uID = 99
+        shell32.Shell_NotifyIconA(NIM_DELETE, byref(nid))
+        user32.SetWindowLongPtrA(self.hwnd, -4, self.original_wndproc)
+        self.tray_added = False
+
+    def handle_tray_msg(self, lparam):
+        if lparam == WM_LBUTTONDBLCLK:
+            self.restore_from_tray()
+        elif lparam == WM_RBUTTONDOWN:
+            self.show_tray_menu()
+
+    def handle_menu_cmd(self, cmd):
+        if cmd == 1001:
+            self.restore_from_tray()
+        elif cmd == 1002:
+            self.exit_app()
+        elif cmd >= 2000 and cmd < 2000 + len(self.pinned):
+            id_ = self.pinned[cmd - 2000]
+            self.copy_pinned(id_)
+
+    def show_tray_menu(self):
+        menu = user32.CreatePopupMenu()
+        pinned_menu = user32.CreatePopupMenu()
+
+        # Pinned items
+        for idx, id_ in enumerate(self.pinned):
+            row = self.c.execute("SELECT title FROM passwords WHERE id=?", (id_,)).fetchone()
+            if row:
+                title = row[0][:50].encode('utf-8')  # Truncate if too long
+                user32.AppendMenuA(pinned_menu, MF_STRING, 2000 + idx, title)
+
+        if len(self.pinned) == 0:
+            user32.AppendMenuA(pinned_menu, MF_STRING, 0, b"No pinned accounts")
+
+        user32.AppendMenuA(menu, MF_STRING | MF_POPUP, pinned_menu, b"Pinned Accounts")
+        user32.AppendMenuA(menu, MF_STRING, 1001, b"Open")
+        user32.AppendMenuA(menu, MF_STRING, 1002, b"Exit")
+
+        pt = POINT()
+        user32.GetCursorPos(byref(pt))
+        user32.SetForegroundWindow(self.hwnd)
+        user32.TrackPopupMenu(menu, 0, pt.x, pt.y, 0, self.hwnd, None)
+        user32.PostMessageA(self.hwnd, 0, 0, 0)
+        user32.DestroyMenu(menu)
+        user32.DestroyMenu(pinned_menu)
+
+    def restore_from_tray(self):
+        self.deiconify()
+        self.lift()
+        self.remove_tray()
+
+    def copy_pinned(self, id_):
+        if self._verify_master_password():
+            row = self.c.execute("SELECT password FROM passwords WHERE id=?", (id_,)).fetchone()
+            if row:
+                pwd_enc = row[0]
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+                self.clipboard_clear()
+                self.clipboard_append(pwd)
+                self.show_balloon("Copied", "Password copied to clipboard!")
+
+    def show_balloon(self, title, msg):
+        nid = NOTIFYICONDATA()
+        nid.cbSize = sizeof(NOTIFYICONDATA)
+        nid.hWnd = self.hwnd
+        nid.uID = 99
+        nid.uFlags = NIF_INFO
+        nid.uVersion = 3
+        nid.szInfoTitle = title.encode('utf-8')[:64]
+        nid.szInfo = msg.encode('utf-8')[:256]
+        nid.dwInfoFlags = NIIF_INFO
+        shell32.Shell_NotifyIconA(NIM_MODIFY, byref(nid))
 
     # --- Setup modal: New or Import ---
     def _show_setup_modal(self):
@@ -757,6 +989,22 @@ class PasswordManager(ctk.CTk):
         except Exception:
             pass
 
+    # --- Save Pinned ---
+    def _save_pinned(self):
+        try:
+            with open(pinned_path, "w", encoding="utf-8") as f:
+                json.dump({"pinned": self.pinned}, f)
+        except Exception:
+            pass
+
+    # --- Save Settings ---
+    def _save_settings(self):
+        try:
+            with open(settings_path, "w", encoding="utf-8") as f:
+                json.dump(self.settings, f)
+        except Exception:
+            pass
+
     # --- Build UI ---
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=BG, height=64)
@@ -806,15 +1054,92 @@ class PasswordManager(ctk.CTk):
                                                 fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12))
             self.edit_order_btn.pack(side="left", padx=4)
 
-        ctk.CTkButton(header, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=80, font=("Nunito", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
-        ctk.CTkButton(header, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
+        ctk.CTkButton(header, text="⚙️", command=self.show_settings_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
         ctk.CTkButton(header, text="Add New", command=self.create_new_card,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80, font=("Nunito", 12)).pack(side="right", padx=4)
 
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         self.check_for_update()
+
+    # --- Settings Popup ---
+    def show_settings_popup(self):
+        if not sys.platform.startswith("win"):
+            messagebox.showinfo("Info", "Settings are only available on Windows.")
+            return
+
+        popup = ctk.CTkToplevel(self)
+        popup.grab_set()
+        popup.title("Settings")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+
+        ctk.CTkLabel(popup, text="Settings", font=("Nunito", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both", expand=False)
+
+        launch_var = ctk.CTkSwitch(frame, text="Launch with Windows")
+        launch_var.pack(pady=10, padx=10)
+        if self.settings.get("launch_with_windows", False):
+            launch_var.select()
+        launch_var.configure(command=lambda: self.toggle_launch(launch_var.get()))
+
+        tray_var = ctk.CTkSwitch(frame, text="Minimize to Tray")
+        tray_var.pack(pady=10, padx=10)
+        if self.settings.get("minimize_to_tray", False):
+            tray_var.select()
+        tray_var.configure(command=lambda: self.toggle_tray(tray_var.get()))
+
+        ctk.CTkButton(frame, text="Export", command=self.export_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
+        ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
+        ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
+
+        ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
+
+        center_popup(popup)
+
+    def toggle_launch(self, value):
+        self.settings["launch_with_windows"] = bool(value)
+        self.toggle_startup(value)
+        self._save_settings()
+
+    def toggle_tray(self, value):
+        self.settings["minimize_to_tray"] = bool(value)
+        # Update startup if launch is enabled
+        if self.settings.get("launch_with_windows", False):
+            self.toggle_startup(True)
+        self._save_settings()
+
+    def toggle_startup(self, enable):
+        if not sys.platform.startswith("win"):
+            return
+        reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        app_name = "BlackHole"
+        if enable:
+            try:
+                cmd = f'"{sys.executable}" "{os.path.abspath(__file__)}"'
+                if self.settings.get("minimize_to_tray", False):
+                    cmd += " --minimize"
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
+                winreg.CloseKey(key)
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to add to startup: {e}")
+        else:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                winreg.DeleteValue(key, app_name)
+                winreg.CloseKey(key)
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to remove from startup: {e}")
 
     def _change_sort(self, event=None):
         val = self.sort_var.get()
@@ -1081,6 +1406,11 @@ class PasswordManager(ctk.CTk):
 
         ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
 
+        pinned_var = ctk.CTkSwitch(popup, text="Pinned to Tray")
+        pinned_var.pack(pady=8)
+        if id_ in self.pinned:
+            pinned_var.select()
+
         def save_card():
             enc_pwd = self.fernet.encrypt(pwd_var.get().encode()).decode() if pwd_var.get() else ""
             icon_to_save = new_icon_path if new_icon_path else current_icon_path
@@ -1092,6 +1422,15 @@ class PasswordManager(ctk.CTk):
             self.c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=?, icon_path=? WHERE id=?",
                            (title_var.get(), user_var.get(), enc_pwd, notes_var.get(), icon_to_save or "", id_))
             self.conn.commit()
+
+            if pinned_var.get():
+                if id_ not in self.pinned:
+                    self.pinned.append(id_)
+            else:
+                if id_ in self.pinned:
+                    self.pinned.remove(id_)
+            self._save_pinned()
+
             popup.grab_release()
             popup.destroy()
             self.load_cards()
@@ -1124,6 +1463,9 @@ class PasswordManager(ctk.CTk):
             if self.order_mode == "custom" and id_ in self.custom_order:
                 self.custom_order.remove(id_)
                 self._save_order()
+            if id_ in self.pinned:
+                self.pinned.remove(id_)
+                self._save_pinned()
             self.load_cards()
 
     # --- Custom Order Popup ---
@@ -1374,76 +1716,90 @@ class PasswordManager(ctk.CTk):
         sys.exit()
 
     def check_for_update(self):
+        q = queue.Queue()
+
         def check_task():
             try:
                 url = "https://api.github.com/repos/DirectedHunt42/BlackHole/releases/latest"
                 req = urllib.request.Request(url, headers={'User-Agent': 'EchoHub', 'Accept': 'application/vnd.github.v3+json'})
                 with urllib.request.urlopen(req) as response:
                     data = json.loads(response.read().decode('utf-8'))
-                self.after(0, lambda d=data: do_update_confirm(d))
+                q.put(data)
             except:
-                pass
+                q.put(None)
+
         threading.Thread(target=check_task, daemon=True).start()
 
-        def do_update_confirm(data):
+        def process_queue():
             try:
-                title = data.get('name', '').strip()
-                if title.lower().startswith("release "):
-                    new_ver = title[len("Release "):].strip()
-                elif title.lower().startswith("v"):
-                    new_ver = title[1:].strip()
-                else:
-                    new_ver = title
+                data = q.get_nowait()
+                if data:
+                    self.do_update_confirm(data)
+            except queue.Empty:
+                pass
+            self.after(100, process_queue)
 
-                current_ver = VERSION
+        self.after(100, process_queue)
 
-                def version_to_tuple(v):
-                    return tuple(map(int, v.strip("v").split(".")))
+    def do_update_confirm(self, data):
+        try:
+            title = data.get('name', '').strip()
+            if title.lower().startswith("release "):
+                new_ver = title[len("Release "):].strip()
+            elif title.lower().startswith("v"):
+                new_ver = title[1:].strip()
+            else:
+                new_ver = title
 
-                if version_to_tuple(new_ver) > version_to_tuple(current_ver):
-                    if messagebox.askyesno("Update Available", f"A new version ({new_ver}) is available. Do you want to download and install it?"):
-                        download_and_install(data)
-            except Exception as e:
-                print(f"Update check failed: {e}")
+            current_ver = VERSION
 
-        def download_and_install(data):
-            progress_popup = ctk.CTkToplevel(self)
-            progress_popup.grab_set()
-            progress_popup.title("Downloading Update")
-            progress_popup.configure(fg_color=BG)
-            progress_popup.resizable(False, False)
-            if os.path.exists(APP_ICON_PATH):
-                try:
-                    progress_popup.after(250, lambda: progress_popup.iconbitmap(APP_ICON_PATH))
-                except Exception:
-                    pass
-            ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
-            center_popup(progress_popup)
-            download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
-            download_bar.pack(pady=(0,12))
-            download_bar.start()
-            progress_popup.update()
+            def version_to_tuple(v):
+                return tuple(map(int, v.strip("v").split(".")))
+
+            if version_to_tuple(new_ver) > version_to_tuple(current_ver):
+                if messagebox.askyesno("Update Available", f"A new version ({new_ver}) is available. Do you want to download and install it?"):
+                    self.download_and_install(data)
+        except Exception as e:
+            print(f"Update check failed: {e}")
+
+    def download_and_install(self, data):
+        progress_popup = ctk.CTkToplevel(self)
+        progress_popup.grab_set()
+        progress_popup.title("Downloading Update")
+        progress_popup.configure(fg_color=BG)
+        progress_popup.resizable(False, False)
+        if os.path.exists(APP_ICON_PATH):
             try:
-                assets = data.get('assets', [])
-                download_url = None
-                for asset in assets:
-                    if asset.get('name','') == 'Black_hole_setup.exe':
-                        download_url = asset.get('browser_download_url', None)
-                        break
-                if not download_url:
-                    raise Exception("No matching asset found")
-                temp_path = os.path.join(os.getenv("TEMP") or ".", "Black_hole_setup.exe")
-                req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
-                with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
-                    shutil.copyfileobj(response, out_file)
-                download_bar.stop()
-                progress_popup.destroy()
-                os.startfile(temp_path)
-                self.quit()
-            except Exception as e:
-                download_bar.stop()
-                progress_popup.destroy()
-                messagebox.showerror("Error", f"Failed to download update: {str(e)}")
+                progress_popup.after(250, lambda: progress_popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
+        center_popup(progress_popup)
+        download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
+        download_bar.pack(pady=(0,12))
+        download_bar.start()
+        progress_popup.update()
+        try:
+            assets = data.get('assets', [])
+            download_url = None
+            for asset in assets:
+                if asset.get('name','') == 'Black_hole_setup.exe':
+                    download_url = asset.get('browser_download_url', None)
+                    break
+            if not download_url:
+                raise Exception("No matching asset found")
+            temp_path = os.path.join(os.getenv("TEMP") or ".", "Black_hole_setup.exe")
+            req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
+            with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
+                shutil.copyfileobj(response, out_file)
+            download_bar.stop()
+            progress_popup.destroy()
+            os.startfile(temp_path)
+            self.quit()
+        except Exception as e:
+            download_bar.stop()
+            progress_popup.destroy()
+            messagebox.showerror("Error", f"Failed to download update: {str(e)}")
 
 # --- Run App ---
 if __name__ == "__main__":
