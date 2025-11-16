@@ -170,23 +170,38 @@ CARD_HOVER = "#111327"
 ACCENT = "#47a3ff"
 ACCENT_DIM = "#2b6f9f"
 TEXT = "#e6eef8"
-# --- Tooltip Class ---
+# --- Tooltip Class (Fixed version with delay to prevent sticking) ---
 class Tooltip:
-    def __init__(self, widget, text):
+    def __init__(self, widget, text, wait_time=500):
         self.widget = widget
         self.text = text
+        self.wait_time = wait_time
         self.tooltip = None
-        self.widget.bind("<Enter>", self.show_tooltip)
+        self.id = None
+        self.widget.bind("<Enter>", self.schedule_show)
         self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def schedule_show(self, event):
+        if self.id is not None:
+            self.widget.after_cancel(self.id)
+        self.id = self.widget.after(self.wait_time, lambda: self.show_tooltip(event))
+
     def show_tooltip(self, event):
+        self.id = None
+        if self.tooltip:
+            return
         x = event.x_root + 20
         y = event.y_root + 20
         self.tooltip = ctk.CTkToplevel(self.widget)
         self.tooltip.wm_overrideredirect(True)
         self.tooltip.wm_geometry(f"+{x}+{y}")
-        label = ctk.CTkLabel(self.tooltip, text=self.text, corner_radius=8, fg_color=CARD, text_color=TEXT, padx=10, pady=5)
+        label = ctk.CTkLabel(self.tooltip, text=self.text, corner_radius=0, fg_color=CARD, text_color=TEXT, padx=10, pady=5)
         label.pack()
+
     def hide_tooltip(self, event):
+        if self.id is not None:
+            self.widget.after_cancel(self.id)
+            self.id = None
         if self.tooltip:
             self.tooltip.destroy()
             self.tooltip = None
