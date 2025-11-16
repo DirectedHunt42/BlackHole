@@ -39,6 +39,15 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 - 🧠 **Master Password System** — Set and manage one key to access your vault.  
 - 💾 **Secure Database** — Uses a local database for encrypted storage.
 
+### Setup
+1. Download Black_hole_setup.exe from the latest release
+2. Run the installer to install the program
+3. On initial setup you can choose to either *setup a new vault*, or *import an existing one*
+4. If you want to setup a new vault, you will be prompted to set a save location. This will be where the database containing your passwords will be stored
+5. You will then be prompted for a master password, which you will use to unlock your vault, you will also be given a sync key, which you will use if you wanted to setup an existing vault
+6. Once you seup your vault, you can click the *add new* to add a new account card
+7. Once the card is created, click the *edit* button to add details, notes and a image, or pin to tray
+
 [![Flag Counter](https://s01.flagcounter.com/count2/TWw2/bg_0D1117/txt_FFFFFF/border_0D1117/columns_8/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/)](https://info.flagcounter.com/TWw2)
 
 [Buy me a coffee](https://buymeacoffee.com/novafoundry)
