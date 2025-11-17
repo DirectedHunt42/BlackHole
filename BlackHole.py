@@ -19,6 +19,7 @@ from PIL import Image, ImageTk
 import urllib
 import ctypes
 import queue
+import openpyxl
 import pandas as pd
 from ctypes import *
 from ctypes.wintypes import *
@@ -144,7 +145,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 # Load all the font files for Tkinter (on Windows)
 if sys.platform.startswith("win"):
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1574,6 +1575,8 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
         ctk.CTkButton(btn_frame, text=".odt", command=self.export_odt,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
+        ctk.CTkButton(btn_frame, text=".xlsx", command=self.export_xlsx,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
         center_popup(popup)
         self.wait_window(popup)
     def export_docx(self):
@@ -1611,6 +1614,24 @@ class PasswordManager(ctk.CTk):
         path = filedialog.asksaveasfilename(defaultextension=".odt", filetypes=[("OpenDocument","*.odt")])
         if path:
             odt.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+
+    def export_xlsx(self):
+        if not self._verify_master_password():
+            return
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["Title", "Username", "Password", "Notes"])
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            ws.append([title, user, pwd, notes])
+        path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel","*.xlsx")])
+        if path:
+            wb.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
     #--- About Popup ---
     def show_about(self):
