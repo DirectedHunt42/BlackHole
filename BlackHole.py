@@ -1563,7 +1563,7 @@ class PasswordManager(ctk.CTk):
         popup.grab_set()
         popup.title("Export Passwords")
         popup.configure(fg_color=BG)
-        popup.geometry("700x500")
+        popup.geometry("1000x500")
         popup.resizable(False, False)
         if os.path.exists(APP_ICON_PATH):
             try:
@@ -1571,7 +1571,7 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Export Passwords", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
-        export_frame = ctk.CTkScrollableFrame(popup, fg_color=BG)
+        export_frame = ctk.CTkScrollableFrame(popup, fg_color=BG, width=400, height=210)
         export_frame.pack(pady=12, padx=12, fill="both", expand=True)
         def add_section(parent, name):
             section = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=8)
