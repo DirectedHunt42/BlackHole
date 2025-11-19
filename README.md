@@ -55,4 +55,4 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 
 [![Flag Counter](https://s01.flagcounter.com/count2/TWw2/bg_0D1117/txt_FFFFFF/border_0D1117/columns_8/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/)](https://info.flagcounter.com/TWw2)
 
-[Buy me a coffee](https://buymeacoffee.com/novafoundry)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-NovaFoundry-6f4e37?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://buymeacoffee.com/novafoundry)
