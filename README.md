@@ -17,6 +17,10 @@
 </p>
 
 <div align="center">
+<a href="https://sourceforge.net/projects/black-hole-passmang/files/latest/download"><img alt="Download Black Hole" src="https://a.fsdn.com/con/app/sf-download-button" width=276 height=48 srcset="https://a.fsdn.com/con/app/sf-download-button?button_size=2x 2x"></a>
+</div>
+
+<div align="center">
 
 ![Commits](https://img.shields.io/github/commit-activity/m/DirectedHunt42/BlackHole?color=blue)
 ![Issues](https://img.shields.io/github/issues/DirectedHunt42/BlackHole)

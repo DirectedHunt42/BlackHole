@@ -13,14 +13,19 @@ from cryptography.hazmat.primitives import hashes
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 from tkinter import messagebox, StringVar, filedialog, Listbox, END
 from docx import Document
-from odf.opendocument import OpenDocumentText
+from odf.opendocument import OpenDocumentText, OpenDocumentSpreadsheet, OpenDocumentPresentation
 from odf.text import P
+from odf.table import Table, TableRow, TableCell
+from odf.draw import Page, Frame, TextBox, Image
+from odf.style import MasterPage
 from PIL import Image, ImageTk
 import urllib
 import ctypes
 import queue
 import openpyxl
 import pandas as pd
+from pptx import Presentation
+from pptx.util import Inches
 from ctypes import *
 from ctypes.wintypes import *
 if sys.platform.startswith("win"):
@@ -145,7 +150,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.5.2"
+VERSION = "1.5.4"
 # Load all the font files for Tkinter (on Windows)
 if sys.platform.startswith("win"):
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -181,12 +186,10 @@ class Tooltip:
         self.id = None
         self.widget.bind("<Enter>", self.schedule_show)
         self.widget.bind("<Leave>", self.hide_tooltip)
-
     def schedule_show(self, event):
         if self.id is not None:
             self.widget.after_cancel(self.id)
         self.id = self.widget.after(self.wait_time, lambda: self.show_tooltip(event))
-
     def show_tooltip(self, event):
         self.id = None
         if self.tooltip:
@@ -198,7 +201,6 @@ class Tooltip:
         self.tooltip.wm_geometry(f"+{x}+{y}")
         label = ctk.CTkLabel(self.tooltip, text=self.text, corner_radius=0, fg_color=CARD, text_color=TEXT, padx=10, pady=5)
         label.pack()
-
     def hide_tooltip(self, event):
         if self.id is not None:
             self.widget.after_cancel(self.id)
@@ -1561,6 +1563,7 @@ class PasswordManager(ctk.CTk):
         popup.grab_set()
         popup.title("Export Passwords")
         popup.configure(fg_color=BG)
+        popup.geometry("1000x500")
         popup.resizable(False, False)
         if os.path.exists(APP_ICON_PATH):
             try:
@@ -1568,15 +1571,35 @@ class PasswordManager(ctk.CTk):
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Export Passwords", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
-        ctk.CTkLabel(popup, text="Choose export format:", text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
-        btn_frame = ctk.CTkFrame(popup, fg_color=BG, corner_radius=0)
-        btn_frame.pack(pady=(12,12))
-        ctk.CTkButton(btn_frame, text=".docx", command=self.export_docx,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
-        ctk.CTkButton(btn_frame, text=".odt", command=self.export_odt,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
-        ctk.CTkButton(btn_frame, text=".xlsx", command=self.export_xlsx,
-                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=12)
+        export_frame = ctk.CTkScrollableFrame(popup, fg_color=BG, width=400, height=210)
+        export_frame.pack(pady=12, padx=12, fill="both", expand=True)
+        def add_section(parent, name):
+            section = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=8)
+            section.pack(fill="x", pady=10, padx=10)
+            ctk.CTkLabel(section, text=name, font=("Nunito", 16, "bold"), text_color=TEXT).pack(pady=5)
+            btn_frame = ctk.CTkFrame(section, fg_color=CARD)
+            btn_frame.pack(pady=5)
+            return btn_frame
+        doc_btns = add_section(export_frame, "Documents")
+        ctk.CTkButton(doc_btns, text=".docx", command=self.export_docx,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(doc_btns, text=".odt", command=self.export_odt,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(doc_btns, text=".txt", command=self.export_txt,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        sheet_btns = add_section(export_frame, "Spreadsheets")
+        ctk.CTkButton(sheet_btns, text=".xlsx", command=self.export_xlsx,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(sheet_btns, text=".ods", command=self.export_ods,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(sheet_btns, text=".csv", command=self.export_csv,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        slide_btns = add_section(export_frame, "Slides")
+        ctk.CTkButton(slide_btns, text=".odp", command=self.export_odp,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(slide_btns, text=".pptx", command=self.export_pptx,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
+        ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
         center_popup(popup)
         self.wait_window(popup)
     def export_docx(self):
@@ -1615,7 +1638,24 @@ class PasswordManager(ctk.CTk):
         if path:
             odt.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
-
+    def export_txt(self):
+        if not self._verify_master_password():
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text","*.txt")])
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
+                for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+                    title, user, pwd_enc, notes = row
+                    try:
+                        pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+                    except Exception:
+                        pwd = ""
+                    f.write(f"Title: {title}\n")
+                    f.write(f"Username: {user}\n")
+                    f.write(f"Password: {pwd}\n")
+                    f.write(f"Notes: {notes}\n")
+                    f.write("-"*30 + "\n")
+            messagebox.showinfo("Exported", f"Exported to {path}")
     def export_xlsx(self):
         if not self._verify_master_password():
             return
@@ -1632,6 +1672,110 @@ class PasswordManager(ctk.CTk):
         path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel","*.xlsx")])
         if path:
             wb.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_ods(self):
+        if not self._verify_master_password():
+            return
+        doc = OpenDocumentSpreadsheet()
+        table = Table(name="Passwords")
+        doc.spreadsheet.addElement(table)
+        header_row = TableRow()
+        for header in ["Title", "Username", "Password", "Notes"]:
+            cell = TableCell()
+            p = P(text=header)
+            cell.addElement(p)
+            header_row.addElement(cell)
+        table.addElement(header_row)
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            data_row = TableRow()
+            for value in [title, user, pwd, notes]:
+                cell = TableCell()
+                p = P(text=value)
+                cell.addElement(p)
+                data_row.addElement(cell)
+            table.addElement(data_row)
+        path = filedialog.asksaveasfilename(defaultextension=".ods", filetypes=[("OpenDocument Spreadsheet","*.ods")])
+        if path:
+            doc.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_csv(self):
+        if not self._verify_master_password():
+            return
+        data = []
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            data.append({"Title": title, "Username": user, "Password": pwd, "Notes": notes})
+        df = pd.DataFrame(data)
+        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
+        if path:
+            df.to_csv(path, index=False)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_odp(self):
+        if not self._verify_master_password():
+            return
+        doc = OpenDocumentPresentation()
+        master = MasterPage(name="Default")
+        doc.masterstyles.addElement(master)
+        rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords").fetchall()
+        for row in rows:
+            id_, title, user, pwd_enc, notes, icon_path = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            page = Page(masterpagename="Default")
+            doc.presentation.addElement(page)
+            if icon_path and os.path.exists(icon_path):
+                href = doc.addPicture(icon_path)
+                image_frame = Frame(width="10cm", height="10cm", x="2cm", y="4cm", anchortype="page")
+                image = Image(href=href, type="simple", show="embed", actuate="onLoad")
+                image_frame.addElement(image)
+                page.addElement(image_frame)
+            text_frame = Frame(width="15cm", height="10cm", x="14cm", y="4cm", anchortype="page")
+            textbox = TextBox()
+            text_frame.addElement(textbox)
+            textbox.addElement(P(text=f"Title: {title}"))
+            textbox.addElement(P(text=f"Username: {user}"))
+            textbox.addElement(P(text=f"Password: {pwd}"))
+            textbox.addElement(P(text=f"Notes: {notes}"))
+            page.addElement(text_frame)
+        path = filedialog.asksaveasfilename(defaultextension=".odp", filetypes=[("OpenDocument Presentation","*.odp")])
+        if path:
+            doc.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_pptx(self):
+        if not self._verify_master_password():
+            return
+        prs = Presentation()
+        rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords").fetchall()
+        for row in rows:
+            id_, title, user, pwd_enc, notes, icon_path = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            slide_layout = prs.slide_layouts[6] # blank slide
+            slide = prs.slides.add_slide(slide_layout)
+            if icon_path and os.path.exists(icon_path):
+                slide.shapes.add_picture(icon_path, Inches(1), Inches(1), Inches(5), Inches(5))
+            txBox = slide.shapes.add_textbox(Inches(7), Inches(1), Inches(5), Inches(5))
+            tf = txBox.text_frame
+            tf.add_paragraph().text = f"Title: {title}"
+            tf.add_paragraph().text = f"Username: {user}"
+            tf.add_paragraph().text = f"Password: {pwd}"
+            tf.add_paragraph().text = f"Notes: {notes}"
+        path = filedialog.asksaveasfilename(defaultextension=".pptx", filetypes=[("PowerPoint","*.pptx")])
+        if path:
+            prs.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
     #--- About Popup ---
     def show_about(self):
