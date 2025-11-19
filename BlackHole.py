@@ -1689,9 +1689,15 @@ class PasswordManager(ctk.CTk):
         support_link = ctk.CTkLabel(popup, text="Support Nova Foundry", font=("Nunito", 12, "underline"),
                                     text_color=ACCENT, fg_color=BG, cursor="hand2")
         support_link.pack(pady=(0, 12))
+        official_link = ctk.CTkLabel(popup, text="Visit Official Website", font=("Nunito", 12, "underline"),
+                                    text_color=ACCENT, fg_color=BG, cursor="hand2")
+        official_link.pack(pady=(0, 12))
+        def open_official_link(event):
+            webbrowser.open_new("https://novafoundry.ca")
         def open_support_link(event):
             webbrowser.open_new("https://buymeacoffee.com/novafoundry")
         support_link.bind("<Button-1>", open_support_link)
+        official_link.bind("<Button-1>", open_official_link)
         ctk.CTkButton(popup, text="OK", command=lambda: (popup.grab_release(), popup.destroy()),
                     fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0, 12))
         center_popup(popup)
