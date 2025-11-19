@@ -5,7 +5,7 @@
 #define MyAppName "Black Hole"
 #define MyAppVersion "1.5.5"
 #define MyAppPublisher "Nova Foundry"
-#define MyAppURL "https://github.com/DirectedHunt42/BlackHole"
+#define MyAppURL "https://novafoundry.ca"
 #define MyAppExeName "BlackHole.exe"
 
 [Setup]
