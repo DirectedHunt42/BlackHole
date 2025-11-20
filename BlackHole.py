@@ -141,6 +141,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 os.chdir(SCRIPT_DIR)
 # --- App Icon ---
 APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
+APP_ICON_PATH_LINUX = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.png")
 BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
 BLACK_HOLE_WIDE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide.png")
 NOVA_FOUNDRY_LOGO = os.path.join(SCRIPT_DIR, "Icons", "Nova_foundry_wide_transparent.png")
@@ -242,9 +243,14 @@ class PasswordManager(ctk.CTk):
         # Hide main window until auth succeeds
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 self.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                self.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX))
             except Exception:
                 pass
         self.attributes('-alpha', 0.0)
@@ -468,9 +474,14 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         closed_by_user = {"val": True}
@@ -570,9 +581,14 @@ class PasswordManager(ctk.CTk):
         popup.resizable(False, False)
         popup.title("Black Hole - Sync Key")
         popup.attributes("-topmost", True)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         closed_by_user = {"val": True}
@@ -611,9 +627,14 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         def on_close():
@@ -650,9 +671,14 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         closed_by_user = {"val": True}
@@ -759,9 +785,14 @@ class PasswordManager(ctk.CTk):
         popup.resizable(False, False)
         popup.title("Black Hole - Master Password")
         popup.attributes("-topmost", True)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH)))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         closed_by_user = {"val": True}
@@ -853,9 +884,14 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.attributes("-topmost", True)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         verified = False
@@ -1076,9 +1112,14 @@ class PasswordManager(ctk.CTk):
         popup.title("Map Columns")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.iconbitmap(APP_ICON_PATH)
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Map Spreadsheet Columns", font=("Nunito", 16, "bold"), text_color=TEXT).pack(pady=(16,6))
@@ -1146,9 +1187,14 @@ class PasswordManager(ctk.CTk):
         popup.title("Settings")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Settings", font=("Nunito", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
@@ -1335,9 +1381,14 @@ class PasswordManager(ctk.CTk):
         popup.title("Create New Password")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Create New Entry", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG, justify="center").pack(pady=(12,6))
@@ -1379,9 +1430,14 @@ class PasswordManager(ctk.CTk):
         popup.title("Edit Entry")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Edit Entry", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
@@ -1500,9 +1556,14 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.grab_set()
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Reorder Entries", font=("Nunito", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
@@ -1571,9 +1632,14 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.geometry("1000x500")
         popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(popup, text="Export Passwords", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,6))
@@ -1790,9 +1856,14 @@ class PasswordManager(ctk.CTk):
         popup.title("About Black Hole")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 popup.after(250, lambda: popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                popup.after(250, lambda: popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         pil_image_bh = Image.open(BLACK_HOLE_LOGO)
@@ -1914,9 +1985,14 @@ class PasswordManager(ctk.CTk):
         progress_popup.title("Downloading Update")
         progress_popup.configure(fg_color=BG)
         progress_popup.resizable(False, False)
-        if os.path.exists(APP_ICON_PATH):
+        if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
                 progress_popup.after(250, lambda: progress_popup.iconbitmap(APP_ICON_PATH))
+            except Exception:
+                pass
+        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
+            try:
+                progress_popup.after(250, lambda: progress_popup.iconphoto(True, ctk.CTkImage(light_image=APP_ICON_PATH_LINUX, dark_image=APP_ICON_PATH_LINUX)))
             except Exception:
                 pass
         ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
