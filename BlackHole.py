@@ -1896,8 +1896,16 @@ class PasswordManager(ctk.CTk):
             def version_to_tuple(v):
                 return tuple(map(int, v.strip("v").split(".")))
             if version_to_tuple(new_ver) > version_to_tuple(current_ver):
-                if messagebox.askyesno("Update Available", f"A new version ({new_ver}) is available. Do you want to download and install it?"):
-                    self.download_and_install(data)
+                message = f"A new version ({new_ver}) is available."
+                if platform.system() == "Windows":
+                    message += " Do you want to download and install it?"
+                else:
+                    message += " Do you want to open the releases page?"
+                if messagebox.askyesno("Update Available", message):
+                    if platform.system() == "Windows":
+                        self.download_and_install(data)
+                    else:
+                        webbrowser.open_new("https://github.com/DirectedHunt42/BlackHole/releases")
         except Exception as e:
             print(f"Update check failed: {e}")
     def download_and_install(self, data):
