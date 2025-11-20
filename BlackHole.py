@@ -26,9 +26,10 @@ import openpyxl
 import pandas as pd
 from pptx import Presentation
 from pptx.util import Inches
-from ctypes import *
-from ctypes.wintypes import *
-if sys.platform.startswith("win"):
+import platform
+if platform.system() == "Windows":
+    from ctypes import *
+    from ctypes.wintypes import *
     import winreg
     user32 = windll.user32
     shell32 = windll.shell32
@@ -125,7 +126,7 @@ if sys.platform.startswith("win"):
     user32.DestroyMenu.argtypes = [HMENU]
     user32.DestroyMenu.restype = BOOL
 # Single instance enforcement using mutex
-if sys.platform.startswith("win"):
+if platform.system() == "Windows":
     ERROR_ALREADY_EXISTS = 183
     mutex_name = "Global\\BlackHole_SingleInstance_Mutex"
     mutex = kernel32.CreateMutexW(None, True, mutex_name)
@@ -152,7 +153,7 @@ FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
 VERSION = "1.5.5"
 # Load all the font files for Tkinter (on Windows)
-if sys.platform.startswith("win"):
+if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
     for font_path in fonts:
         ctypes.windll.gdi32.AddFontResourceA(font_path.encode('utf-8'))
@@ -161,7 +162,10 @@ if sys.platform.startswith("win"):
     WM_FONTCHANGE = 0x001D
     ctypes.windll.user32.SendMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
 # --- Paths ---
-local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+if platform.system() == "Windows":
+    local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+else:
+    local_appdata = os.path.expanduser("~/.config")
 nova_folder = os.path.join(local_appdata, "NovaFoundry")
 os.makedirs(nova_folder, exist_ok=True)
 stored_icons_path = os.path.join(nova_folder, "StoredIcons")
@@ -311,7 +315,7 @@ class PasswordManager(ctk.CTk):
             self.load_cards()
             self.ui_built = True
         # Tray setup
-        if sys.platform.startswith("win"):
+        if platform.system() == "Windows":
             self.hwnd = None
             self.callback_message = None
             self.new_wndproc_ptr = None
@@ -342,11 +346,12 @@ class PasswordManager(ctk.CTk):
         else:
             self.exit_app()
     def exit_app(self):
-        self.remove_tray()
+        if platform.system() == "Windows":
+            self.remove_tray()
         self.destroy()
     # --- Tray functions ---
     def add_tray(self):
-        if not sys.platform.startswith("win") or self.tray_added:
+        if platform.system() != "Windows" or self.tray_added:
             return
         self.hwnd = self.winfo_id()
         self.msg_taskbar_created = user32.RegisterWindowMessageA(b"TaskbarCreated")
@@ -377,7 +382,7 @@ class PasswordManager(ctk.CTk):
         shell32.Shell_NotifyIconA(NIM_ADD, byref(nid))
         self.tray_added = True
     def remove_tray(self):
-        if not sys.platform.startswith("win") or not self.tray_added:
+        if platform.system() != "Windows" or not self.tray_added:
             return
         nid = NOTIFYICONDATA()
         nid.cbSize = sizeof(NOTIFYICONDATA)
@@ -443,7 +448,8 @@ class PasswordManager(ctk.CTk):
                 if messagebox.askyesno("Confirm Copy", f"Are you sure you want to copy the password for '{title}' to the clipboard?"):
                     self.clipboard_clear()
                     self.clipboard_append(pwd)
-                    self.show_balloon("Copied", "Password copied to clipboard!")
+                    if platform.system() == "Windows":
+                        self.show_balloon("Copied", "Password copied to clipboard!")
     def show_balloon(self, title, msg):
         nid = NOTIFYICONDATA()
         nid.cbSize = sizeof(NOTIFYICONDATA)
@@ -1132,7 +1138,7 @@ class PasswordManager(ctk.CTk):
         center_popup(popup)
     # --- Settings Popup ---
     def show_settings_popup(self):
-        if not sys.platform.startswith("win"):
+        if platform.system() != "Windows":
             messagebox.showinfo("Info", "Settings are only available on Windows.")
             return
         popup = ctk.CTkToplevel(self)
@@ -1173,7 +1179,7 @@ class PasswordManager(ctk.CTk):
             self.toggle_startup(True)
         self._save_settings()
     def toggle_startup(self, enable):
-        if not sys.platform.startswith("win"):
+        if platform.system() != "Windows":
             return
         reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         app_name = "BlackHole"
