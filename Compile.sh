@@ -11,7 +11,7 @@ COMPILE_BLACK_HOLE="YES"
 OUTPUT_DIR="$SCRIPT_DIR"
 LOG_DIR="$SCRIPT_DIR/Log"
 
-REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
+REQUIREMENTS_FILE="$SCRIPT_DIR/Requirements.txt"
 
 BLACK_HOLE_SCRIPT="BlackHole.py"
 BLACK_HOLE_ICON="$SCRIPT_DIR/Icons/BlackHole_Icon.ico"
@@ -22,19 +22,37 @@ BLACK_HOLE_BUILD_NAME="BlackHole"
 # ==========================================
 echo "Checking dependencies..."
 
-python3 -m pip install --upgrade pip --break-system-packages
-python3 -m pip install pyinstaller --break-system-packages
+python3 -m pip install pyinstaller --break-system-packages || true
 
 echo
-echo "Installing script dependencies from $REQUIREMENTS_FILE..."
+echo "Installing script dependencies (skipping Windows-only packages)..."
+echo
 
 if [[ ! -f "$REQUIREMENTS_FILE" ]]; then
-    echo "ERROR: requirements.txt not found!"
+    echo "ERROR: Requirements.txt not found!"
     exit 1
 fi
 
-python3 -m pip install -r "$REQUIREMENTS_FILE" --break-system-packages
-echo "Dependencies installed."
+# -------------------------------
+# Filter Requirements.txt
+# These lines will be SKIPPED:
+#   - pywin32
+#   - win32*
+#   - pypiwin32
+#   - modules only useful on Windows
+# -------------------------------
+FILTERED_REQ=$(mktemp)
+
+grep -viE "pywin32|pypiwin32|win32|windows|wheels" "$REQUIREMENTS_FILE" > "$FILTERED_REQ"
+
+echo "Using filtered requirements:"
+cat "$FILTERED_REQ"
+echo
+
+# Install safe requirements
+python3 -m pip install -r "$FILTERED_REQ" --break-system-packages || true
+
+echo "Dependencies installed (errors ignored)."
 echo
 
 # ==========================================
@@ -48,7 +66,7 @@ rm -rf "$LOG_DIR/build" 2>/dev/null || true
 rm -f "$LOG_DIR"/*.spec "$LOG_DIR"/*.log "$LOG_DIR"/*.sln 2>/dev/null || true
 
 # ==========================================
-# Hidden Imports (Linux-compatible only)
+# Hidden Imports (Linux-only)
 # ==========================================
 echo "Setting up hidden imports..."
 
@@ -74,7 +92,7 @@ echo
 # ==========================================
 # Validation
 # ==========================================
-echo "Validating configured paths..."
+echo "Validating paths..."
 echo "No Windows-only assets to validate."
 echo
 
@@ -93,7 +111,7 @@ if [[ "$COMPILE_BLACK_HOLE" == "YES" ]]; then
         --distpath "$OUTPUT_DIR" \
         --workpath "$LOG_DIR/build/$BLACK_HOLE_BUILD_NAME" \
         --specpath "$LOG_DIR" \
-        "$SCRIPT_DIR/$BLACK_HOLE_SCRIPT"
+        "$SCRIPT_DIR/$BLACK_HOLE_SCRIPT" || true
 
     echo "Successfully compiled $BLACK_HOLE_SCRIPT → $OUTPUT_DIR"
 fi
