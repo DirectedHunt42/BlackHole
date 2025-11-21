@@ -231,6 +231,11 @@ def center_popup(popup):
     x = (popup.winfo_screenwidth() // 2) - (width // 2)
     y = (popup.winfo_screenheight() // 2) - (height // 2)
     popup.geometry(f"{width}x{height}+{x}+{y}")
+def safe_modal(popup):
+    center_popup(popup)
+    popup.update_idletasks()
+    popup.update()
+    popup.grab_set()
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
     def set_window_icon(window):
@@ -512,9 +517,7 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
         ctk.CTkButton(btn_frame, text="Import Vault", command=setup_import,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
         return not closed_by_user["val"]
     # --- Setup New ---
@@ -608,9 +611,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(frame, text="Submit", command=submit,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,10))
         sync_entry.focus_set()
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
         return not closed_by_user["val"]
     # --- Sync Key display popup ---
@@ -646,9 +647,7 @@ class PasswordManager(ctk.CTk):
         btn_frame.pack(pady=(12,12))
         ctk.CTkButton(btn_frame, text="OK", command=on_close,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     # --- Master Create modal ---
     def _show_master_create_modal(self):
@@ -752,9 +751,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
         pwd_entry.focus_set()
         pwd_entry.bind("<Return>", lambda e: create_master())
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
     # --- Master Unlock modal ---
@@ -841,9 +838,7 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(side="left", padx=12)
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
         pwd_entry.focus_set()
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and self.fernet is not None
     # --- Auth modal for normal unlock ---
@@ -935,9 +930,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(btn_frame, text="Cancel", command=on_close, fg_color="#3a3a3a", width=120).pack(side="left", padx=6)
         pwd_entry.focus_set()
         pwd_entry.bind("<Return>", lambda e: verify_master())
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
         return not closed_by_user["val"] and verified
     # --- Initialize DB ---
@@ -1133,9 +1126,7 @@ class PasswordManager(ctk.CTk):
             self.load_cards()
             messagebox.showinfo("Imported", f"Imported {count} entries successfully.")
         ctk.CTkButton(popup, text="Import", command=do_import, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,12))
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     # --- Settings Popup ---
     def show_settings_popup(self):
@@ -1164,9 +1155,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
         ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     def toggle_launch(self, value):
         self.settings["launch_with_windows"] = bool(value)
@@ -1358,9 +1347,7 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=140).pack(pady=(12,10))
         title_entry.focus_set()
         popup.bind("<Return>", lambda e: create_card_action())
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
@@ -1450,9 +1437,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Save", command=save_card, fg_color=ACCENT, text_color=BG, width=120).pack(pady=(6,12))
         popup.bind("<Control-s>", lambda e: save_card())
         popup.bind("<Return>", lambda e: save_card())
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     # --- Delete ---
     def delete_card(self, id_):
@@ -1556,9 +1541,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Save", command=save_reorder, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0,12))
         popup.bind("<Control-s>", lambda e: save_reorder())
         popup.bind("<Return>", lambda e: save_reorder())
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     # --- Export ---
     def export_popup(self):
@@ -1599,9 +1582,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(slide_btns, text=".pptx", command=self.export_pptx,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     def export_docx(self):
         if not self._verify_master_password():
@@ -1841,9 +1822,7 @@ class PasswordManager(ctk.CTk):
         official_link.bind("<Button-1>", open_official_link)
         ctk.CTkButton(popup, text="OK", command=lambda: (popup.grab_release(), popup.destroy()),
                     fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0, 12))
-        center_popup(popup)
-        popup.update()
-        popup.grab_set()
+        safe_modal(popup)
         self.wait_window(popup)
     def reset_app(self):
         if not messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the app? This will delete settings and stored icons, but not the database."):
