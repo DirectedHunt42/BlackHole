@@ -75,6 +75,7 @@ HIDDEN_IMPORTS=(
     "--hidden-import=tkinter"
     "--hidden-import=PIL"
     "--hidden-import=PIL.ImageTk"
+    "--hidden-import=PIL._tkinter_finder"
     "--hidden-import=cryptography"
     "--hidden-import=cryptography.hazmat.backends"
     "--hidden-import=cryptography.hazmat.primitives.kdf.pbkdf2"
@@ -85,6 +86,8 @@ HIDDEN_IMPORTS=(
     "--hidden-import=urllib.request"
     "--hidden-import=pptx"
     "--exclude-module=PIL._avif"
+    "--upx-exclude=PIL/_imaging*.so"
+    "--upx-exclude=PIL/_imagingtk*.so"
 )
 
 echo "Hidden imports set."
@@ -108,6 +111,7 @@ if [[ "$COMPILE_BLACK_HOLE" == "YES" ]]; then
     pyinstaller --noconfirm --onefile --windowed \
         --icon="$BLACK_HOLE_ICON" \
         --clean \
+        --noupx \
         "${HIDDEN_IMPORTS[@]}" \
         --distpath "$OUTPUT_DIR" \
         --workpath "$LOG_DIR/build/$BLACK_HOLE_BUILD_NAME" \
