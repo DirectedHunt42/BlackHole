@@ -241,7 +241,7 @@ class PasswordManager(ctk.CTk):
     def set_window_icon(window):
         if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
-                window.iconbitmap(APP_ICON_PATH)
+                window.after(250, lambda: window.iconbitmap(APP_ICON_PATH))
             except:
                 pass
         elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
