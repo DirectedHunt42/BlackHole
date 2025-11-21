@@ -3,7 +3,7 @@
 ; Non-commercial use only
 
 #define MyAppName "Black Hole"
-#define MyAppVersion "1.6.0"
+#define MyAppVersion "1.6.1"
 #define MyAppPublisher "Nova Foundry"
 #define MyAppURL "https://novafoundry.ca"
 #define MyAppExeName "BlackHole.exe"

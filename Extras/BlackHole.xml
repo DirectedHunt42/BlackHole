@@ -1,7 +1,7 @@
 <project>
     <shortName>BlackHole</shortName>
     <fullName>Black Hole Password Manager</fullName>
-    <version>1.6.0</version>
+    <version>1.6.1</version>
     <readmeFile>C:/Users/jackp/Downloads/Linux/BlackHole/README.md</readmeFile>
     <licenseFile>C:/Users/jackp/Downloads/Linux/BlackHole/LICENSE.txt</licenseFile>
     <logoImage>C:/Users/jackp/Downloads/Black Hole Installer.png</logoImage>
