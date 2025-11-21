@@ -599,7 +599,6 @@ class PasswordManager(ctk.CTk):
     # --- Sync Key input modal ---
     def _show_sync_key_modal(self):
         popup = ctk.CTkToplevel(self)
-        popup.grab_set()
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         popup.title("Black Hole - Sync Key")
@@ -1086,7 +1085,6 @@ class PasswordManager(ctk.CTk):
         columns = list(df.columns)
         columns = [str(col) for col in columns]
         popup = ctk.CTkToplevel(self)
-        popup.grab_set()
         popup.title("Map Columns")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
@@ -1339,7 +1337,6 @@ class PasswordManager(ctk.CTk):
     # --- Create Card ---
     def create_new_card(self):
         popup = ctk.CTkToplevel(self)
-        popup.grab_set()
         popup.title("Create New Password")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
@@ -1380,7 +1377,6 @@ class PasswordManager(ctk.CTk):
         except Exception:
             pwd = ""
         popup = ctk.CTkToplevel(self)
-        popup.grab_set()
         popup.title("Edit Entry")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
@@ -1501,7 +1497,6 @@ class PasswordManager(ctk.CTk):
         popup.title("Custom Order")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
-        popup.grab_set()
         PasswordManager.set_window_icon(popup)
         ctk.CTkLabel(popup, text="Reorder Entries", font=("Nunito", 16, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(16,6))
         frame = ctk.CTkFrame(popup, fg_color=BG)
@@ -1565,7 +1560,6 @@ class PasswordManager(ctk.CTk):
     # --- Export ---
     def export_popup(self):
         popup = ctk.CTkToplevel(self)
-        popup.grab_set()
         popup.title("Export Passwords")
         popup.configure(fg_color=BG)
         popup.geometry("1000x500")
@@ -1781,7 +1775,6 @@ class PasswordManager(ctk.CTk):
     #--- About Popup ---
     def show_about(self):
         popup = ctk.CTkToplevel(self)
-        popup.grab_set()
         popup.title("About Black Hole")
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
