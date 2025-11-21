@@ -1,0 +1,53 @@
+<project>
+    <shortName>BlackHole</shortName>
+    <fullName>Black Hole Password Manager</fullName>
+    <version>1.6.0</version>
+    <readmeFile>C:/Users/jackp/Downloads/Linux/BlackHole/README.md</readmeFile>
+    <licenseFile>C:/Users/jackp/Downloads/Linux/BlackHole/LICENSE.txt</licenseFile>
+    <logoImage>C:/Users/jackp/Downloads/Black Hole Installer.png</logoImage>
+    <splashImage>C:/Users/jackp/Downloads/Linux/BlackHole/Icons/BlackHole_Transparent_Wide.png</splashImage>
+    <componentList>
+        <component name="default">
+            <description>Default Component</description>
+            <canBeEdited>1</canBeEdited>
+            <selected>1</selected>
+            <show>1</show>
+
+            <!-- Project files -->
+
+            <folderList>
+                <folder destination="${installdir}" name="programfileslinux">
+                    <description>Program Files</description>
+                    <platforms>linux</platforms>
+                    <distributionFileList>
+                        <distributionDirectory>
+                            <origin>C:/Users/jackp/Downloads/Linux/BlackHole</origin>
+                        </distributionDirectory>
+                    </distributionFileList>
+                </folder>
+            </folderList>
+        </component>
+    </componentList>
+    <enableRollback>1</enableRollback>
+    <enableTimestamp>1</enableTimestamp>
+    <vendor>Nova Foundry</vendor>
+
+    <!-- Installation directory parameter -->
+
+    <parameterList>
+        <directoryParameter>
+            <name>installdir</name>
+            <description>Installer.Parameter.installdir.description</description>
+            <explanation>Installer.Parameter.installdir.explanation</explanation>
+            <value></value>
+            <default>${platform_install_prefix}/${product_shortname}-${product_version}</default>
+            <allowEmptyValue>0</allowEmptyValue>
+            <ask>yes</ask>
+            <cliOptionName>prefix</cliOptionName>
+            <mustBeWritable>yes</mustBeWritable>
+            <mustExist>0</mustExist>
+            <width>40</width>
+        </directoryParameter>
+    </parameterList>
+</project>
+
