@@ -319,7 +319,10 @@ class PasswordManager(ctk.CTk):
         if self.authenticated:
             self._build_ui()
             self.attributes('-alpha', 1.0)
-            self.after(0, lambda: self.state('zoomed'))
+            if platform.system() == "Windows":
+                self.after(250, lambda: self.state('zoomed'))
+            else:
+                self.after(250, lambda: self.attributes('-zoomed', True))
             self.load_cards()
             self.ui_built = True
         # Tray setup
@@ -444,7 +447,10 @@ class PasswordManager(ctk.CTk):
             self.load_cards()
             self.ui_built = True
         self.attributes('-alpha', 1.0)
-        self.after(0, lambda: self.state('zoomed'))
+        if platform.system() == "Windows":
+            self.after(250, lambda: self.state('zoomed'))
+        else:
+            self.after(250, lambda: self.attributes('-zoomed', True))
         self.deiconify()
         self.lift()
     def copy_pinned(self, id_):
@@ -1116,6 +1122,7 @@ class PasswordManager(ctk.CTk):
             messagebox.showinfo("Imported", f"Imported {count} entries successfully.")
         ctk.CTkButton(popup, text="Import", command=do_import, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,12))
         center_popup(popup)
+        self.wait_window(popup)
     # --- Settings Popup ---
     def show_settings_popup(self):
         if platform.system() != "Windows":
@@ -1144,6 +1151,7 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
         ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
         center_popup(popup)
+        self.wait_window(popup)
     def toggle_launch(self, value):
         self.settings["launch_with_windows"] = bool(value)
         self.toggle_startup(value)
@@ -1335,6 +1343,7 @@ class PasswordManager(ctk.CTk):
         title_entry.focus_set()
         popup.bind("<Return>", lambda e: create_card_action())
         center_popup(popup)
+        self.wait_window(popup)
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
         row = self.c.execute("SELECT title, username, password, notes, icon_path FROM passwords WHERE id=?", (id_,)).fetchone()
@@ -1424,6 +1433,7 @@ class PasswordManager(ctk.CTk):
         popup.bind("<Control-s>", lambda e: save_card())
         popup.bind("<Return>", lambda e: save_card())
         center_popup(popup)
+        self.wait_window(popup)
     # --- Delete ---
     def delete_card(self, id_):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
@@ -1527,6 +1537,7 @@ class PasswordManager(ctk.CTk):
         popup.bind("<Control-s>", lambda e: save_reorder())
         popup.bind("<Return>", lambda e: save_reorder())
         center_popup(popup)
+        self.wait_window(popup)
     # --- Export ---
     def export_popup(self):
         popup = ctk.CTkToplevel(self)
@@ -1567,6 +1578,7 @@ class PasswordManager(ctk.CTk):
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
         center_popup(popup)
+        self.wait_window(popup)
         self.wait_window(popup)
     def export_docx(self):
         if not self._verify_master_password():
@@ -1873,6 +1885,7 @@ class PasswordManager(ctk.CTk):
         PasswordManager.set_window_icon(progress_popup)
         ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
         center_popup(progress_popup)
+        self.wait_window(progress_popup)
         download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
         download_bar.pack(pady=(0,12))
         download_bar.start()
