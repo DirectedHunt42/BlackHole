@@ -152,7 +152,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.5.5"
+VERSION = "1.6.0"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -241,13 +241,32 @@ class PasswordManager(ctk.CTk):
     def set_window_icon(window):
         if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
-                window.after(250, lambda: window.iconbitmap(APP_ICON_PATH))
+                window.after(100, lambda: window.iconbitmap(APP_ICON_PATH))
             except:
                 pass
-        elif platform.system() == "Linux" and os.path.exists(APP_ICON_PATH_LINUX):
-            icon = ImageTk.PhotoImage(file=APP_ICON_PATH_LINUX)
-            window.iconphoto(True, icon)
-            window._icon = icon
+
+        elif platform.system() == "Linux":
+            icon_path_xbm = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.xbm")
+            if os.path.exists(icon_path_xbm):
+                try:
+                    window.wm_iconbitmap(icon_path_xbm)
+                except:
+                    pass
+            elif os.path.exists(APP_ICON_PATH_LINUX):
+                try:
+                    img = Image.open(APP_ICON_PATH_LINUX)
+                    import io
+                    output = io.BytesIO()
+                    img.convert("RGBA").save(output, format="PPM")
+                    data = output.getvalue()
+                    window.iconphoto(True, ctk.CTkImage(light_image=img, dark_image=img))
+                except:
+                    pass
+
+        elif platform.system() == "Darwin":
+            if os.path.exists(APP_ICON_PATH_LINUX):
+                img = Image.open(APP_ICON_PATH_LINUX)
+                window.iconphoto(True, ImageTk.PhotoImage(img))
     
     def __init__(self):
         super().__init__()
