@@ -84,6 +84,7 @@ HIDDEN_IMPORTS=(
     "--hidden-import=odf.text"
     "--hidden-import=urllib.request"
     "--hidden-import=pptx"
+    "--exclude-module=PIL._avif"
 )
 
 echo "Hidden imports set."
