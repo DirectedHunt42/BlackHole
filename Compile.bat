@@ -10,6 +10,14 @@ REM Define all your scripts, icons, and paths here.
 REM Build Toggles
 REM Set to "YES" to compile, any other value to skip
 set "COMPILE_BLACK_HOLE=YES"
+REM CRITICAL: Add these lines (you are missing them!)
+set "EXTRA_DATA="
+set "EXTRA_DATA=%EXTRA_DATA% --add-data "%SCRIPT_DIR%\Icons;Icons""
+set "EXTRA_DATA=%EXTRA_DATA% --add-data "%SCRIPT_DIR%\Fonts;Fonts""
+set "EXTRA_DATA=%EXTRA_DATA% --add-data "%SCRIPT_DIR%\LICENSE.txt;.""
+
+REM Optional but recommended
+set "EXTRA_DATA=%EXTRA_DATA% --add-binary "%SystemRoot%\system32\shell32.dll;.""
 REM Main Directories
 set "OUTPUT_DIR=%SCRIPT_DIR%"
 set "LOG_DIR=%SCRIPT_DIR%\Log"
@@ -124,10 +132,11 @@ if /I "%COMPILE_BLACK_HOLE%" == "YES" (
     echo
    
     REM Use 'py -m PyInstaller' to run the module
-    py -m PyInstaller --noconfirm --onefile --windowed ^
+        py -m PyInstaller --noconfirm --onefile --windowed ^
         --icon "%BLACK_HOLE_ICON%" ^
         --clean ^
         !HIDDEN_IMPORTS! ^
+        !EXTRA_DATA! ^
         --distpath "%OUTPUT_DIR%" ^
         --workpath "%LOG_DIR%\build\%BLACK_HOLE_BUILD_NAME%" ^
         --specpath "%LOG_DIR%" ^
