@@ -152,7 +152,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -279,7 +279,7 @@ class PasswordManager(ctk.CTk):
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
         PasswordManager.set_window_icon(self)
-        self.attributes('-alpha', 0.0)
+        self.withdraw()
         # encryption / state
         self.master_password = None
         self.fernet = None
@@ -342,7 +342,7 @@ class PasswordManager(ctk.CTk):
             sys.exit()
         if self.authenticated:
             self._build_ui()
-            self.attributes('-alpha', 1.0)
+            self.deiconify()
             if platform.system() == "Windows":
                 self.after(250, lambda: self.state('zoomed'))
             else:
@@ -470,7 +470,7 @@ class PasswordManager(ctk.CTk):
             self._build_ui()
             self.load_cards()
             self.ui_built = True
-        self.attributes('-alpha', 1.0)
+
         if platform.system() == "Windows":
             self.after(250, lambda: self.state('zoomed'))
         else:
