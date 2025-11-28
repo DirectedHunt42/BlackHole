@@ -53,7 +53,9 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 6. Once you seup your vault, you can click the *add new* to add a new account card
 7. Once the card is created, click the *edit* button to add details, notes and a image, or pin to tray
 
-[![Flag Counter](https://s01.flagcounter.com/count2/TWw2/bg_0D1117/txt_FFFFFF/border_0D1117/columns_8/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/)](https://info.flagcounter.com/TWw2)
+<div>
+  <a href="https://info.flagcounter.com/TWw2"><img src="https://s01.flagcounter.com/count2/TWw2/bg_0B0F1A/txt_FFFFFF/border_FFFFFF/columns_4/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/" alt="Flag Counter" border="0"></a>
+</div>
 
 ---
 
