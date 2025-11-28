@@ -152,7 +152,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.6.3"
+VERSION = "1.6.4"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1058,6 +1058,10 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         about_btn.pack(side="right", padx=4)
         Tooltip(about_btn, "About")
+        sync_key_btn = ctk.CTkButton(header, text="🔑", command=self.reshow_sync_key_display_popup,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        sync_key_btn.pack(side="right", padx=4)
+        Tooltip(sync_key_btn, "Show Sync Key")
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Keyboard bindings for main window
@@ -1169,11 +1173,20 @@ class PasswordManager(ctk.CTk):
         if self.settings.get("minimize_to_tray", False):
             tray_var.select()
         tray_var.configure(command=lambda: self.toggle_tray(tray_var.get()))
+        ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
         ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
         safe_modal(popup)
         self.wait_window(popup)
+    def reshow_sync_key_display_popup(self):
+        if not self._verify_master_password():
+            return
+        if self.salt is None:
+            messagebox.showerror("Error", "No sync key available.")
+            return
+        sync_key = urlsafe_b64encode(self.salt).decode("utf-8")
+        self._show_sync_key_display_popup(sync_key)
     def toggle_launch(self, value):
         self.settings["launch_with_windows"] = bool(value)
         self.toggle_startup(value)
