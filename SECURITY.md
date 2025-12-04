@@ -19,7 +19,7 @@ If you discover a security vulnerability in this project, please **do not open a
 
 Instead, report it responsibly by contacting:
 
-📧 **jackpwmurray@gmail.com**
+📧 **security@novafoundry.ca**
 
 Please include the following details in your report:
 
