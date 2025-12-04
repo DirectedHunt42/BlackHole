@@ -152,7 +152,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.6.4"
+VERSION = "1.6.5"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -964,12 +964,29 @@ class PasswordManager(ctk.CTk):
                 notes TEXT
             )
         ''')
+        # Migration: Drop icon_path column if it exists from old databases
         try:
-            self.c.execute("ALTER TABLE passwords ADD COLUMN icon_path TEXT")
-        except sqlite3.OperationalError as e:
-            if "duplicate column" not in str(e).lower():
-                raise
-        self.conn.commit()
+            self.c.execute("PRAGMA table_info(passwords)")
+            columns = [col[1] for col in self.c.fetchall()]
+            if "icon_path" in columns:
+                # Create new table without icon_path
+                self.c.execute('''
+                    CREATE TABLE passwords_new (
+                        id INTEGER PRIMARY KEY,
+                        title TEXT,
+                        username TEXT,
+                        password TEXT,
+                        notes TEXT
+                    )
+                ''')
+                # Copy data from old table
+                self.c.execute("INSERT INTO passwords_new SELECT id, title, username, password, notes FROM passwords")
+                # Drop old table and rename new one
+                self.c.execute("DROP TABLE passwords")
+                self.c.execute("ALTER TABLE passwords_new RENAME TO passwords")
+                self.conn.commit()
+        except Exception as e:
+            pass
     # --- Save Order ---
     def _save_order(self):
         data = {
@@ -1134,8 +1151,8 @@ class PasswordManager(ctk.CTk):
                 pwd = row[pwd_col] if pwd_col and pwd_col in row else ""
                 notes = row[notes_col] if notes_col and notes_col in row else ""
                 enc_pwd = self.fernet.encrypt(str(pwd).encode()).decode() if pwd else ""
-                self.c.execute("INSERT INTO passwords (title, username, password, notes, icon_path) VALUES (?, ?, ?, ?, ?)",
-                               (str(title), str(user), enc_pwd, str(notes), ""))
+                self.c.execute("INSERT INTO passwords (title, username, password, notes) VALUES (?, ?, ?, ?)",
+                               (str(title), str(user), enc_pwd, str(notes)))
                 self.conn.commit()
                 count += 1
                 if self.order_mode == "custom":
@@ -1249,13 +1266,13 @@ class PasswordManager(ctk.CTk):
             widget.destroy()
         search_term = self.search_var.get().strip().lower()
         if self.order_mode == "default":
-            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY id DESC")
+            self.c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY id DESC")
         elif self.order_mode == "a-z":
-            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY LOWER(title) ASC")
+            self.c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY LOWER(title) ASC")
         elif self.order_mode == "z-a":
-            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords ORDER BY LOWER(title) DESC")
+            self.c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY LOWER(title) DESC")
         else: # custom
-            self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords")
+            self.c.execute("SELECT id, title, username, password, notes FROM passwords")
             rows = self.c.fetchall()
             current_ids = [r[0] for r in rows]
             self.custom_order = [id_ for id_ in self.custom_order if id_ in current_ids]
@@ -1283,7 +1300,7 @@ class PasswordManager(ctk.CTk):
                 num_columns = 1
         self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
         for i, row in enumerate(rows):
-            id_, title, user, pwd_enc, notes, _ = row # Ignore stored icon_path
+            id_, title, user, pwd_enc, notes = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
             except Exception:
@@ -1363,7 +1380,7 @@ class PasswordManager(ctk.CTk):
             if not title:
                 messagebox.showerror("Error", "Title required!", parent=popup)
                 return
-            self.c.execute("INSERT INTO passwords (title, username, password, notes, icon_path) VALUES (?, ?, ?, ?, ?)", (title, "", "", "", ""))
+            self.c.execute("INSERT INTO passwords (title, username, password, notes) VALUES (?, ?, ?, ?)", (title, "", "", ""))
             self.conn.commit()
             if self.order_mode == "custom":
                 new_id = self.c.lastrowid
@@ -1380,11 +1397,11 @@ class PasswordManager(ctk.CTk):
         self.wait_window(popup)
     # --- Edit Card Popup ---
     def edit_card_popup(self, id_):
-        row = self.c.execute("SELECT title, username, password, notes, icon_path FROM passwords WHERE id=?", (id_,)).fetchone()
+        row = self.c.execute("SELECT title, username, password, notes FROM passwords WHERE id=?", (id_,)).fetchone()
         if not row:
             messagebox.showerror("Error", "Entry not found.")
             return
-        title, user, pwd_enc, notes, current_icon_path = row
+        title, user, pwd_enc, notes = row
         try:
             pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
         except Exception:
@@ -1443,14 +1460,18 @@ class PasswordManager(ctk.CTk):
             pinned_var.select()
         def save_card():
             enc_pwd = self.fernet.encrypt(pwd_var.get().encode()).decode() if pwd_var.get() else ""
-            icon_to_save = new_icon_path if new_icon_path else current_icon_path
-            if new_icon_path and current_icon_path and os.path.exists(current_icon_path):
-                try:
-                    os.remove(current_icon_path)
-                except:
-                    pass
-            self.c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=?, icon_path=? WHERE id=?",
-                           (title_var.get(), user_var.get(), enc_pwd, notes_var.get(), icon_to_save or "", id_))
+            # If new icon was uploaded, remove old icon file
+            if new_icon_path:
+                # Remove old icons with different extensions
+                for ext in ['.png', '.jpg', '.jpeg']:
+                    old_path = os.path.join(stored_icons_path, f"{id_}{ext}")
+                    if os.path.exists(old_path) and old_path != new_icon_path:
+                        try:
+                            os.remove(old_path)
+                        except:
+                            pass
+            self.c.execute("UPDATE passwords SET title=?, username=?, password=?, notes=? WHERE id=?",
+                           (title_var.get(), user_var.get(), enc_pwd, notes_var.get(), id_))
             self.conn.commit()
             if pinned_var.get():
                 if id_ not in self.pinned:
@@ -1470,13 +1491,7 @@ class PasswordManager(ctk.CTk):
     # --- Delete ---
     def delete_card(self, id_):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
-            row = self.c.execute("SELECT icon_path FROM passwords WHERE id=?", (id_,)).fetchone()
-            if row and row[0] and os.path.exists(row[0]):
-                try:
-                    os.remove(row[0])
-                except:
-                    pass
-            # Also remove any searched icon files
+            # Remove icon files by ID
             for ext in ['.png', '.jpg', '.jpeg']:
                 possible_path = os.path.join(stored_icons_path, f"{id_}{ext}")
                 if os.path.exists(possible_path):
@@ -1731,18 +1746,25 @@ class PasswordManager(ctk.CTk):
         if not self._verify_master_password():
             return
         doc = OpenDocumentPresentation()
-        master = MasterPage(name="Default")
+        master = MasterPage(name="Default", pagelayoutname="Default")
         doc.masterstyles.addElement(master)
-        rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords").fetchall()
+        rows = self.c.execute("SELECT id, title, username, password, notes FROM passwords").fetchall()
         for row in rows:
-            id_, title, user, pwd_enc, notes, icon_path = row
+            id_, title, user, pwd_enc, notes = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
             except Exception:
                 pwd = ""
             page = Page(masterpagename="Default")
             doc.presentation.addElement(page)
-            if icon_path and os.path.exists(icon_path):
+            # Search for icon by file name
+            icon_path = None
+            for ext in ['.png', '.jpg', '.jpeg']:
+                possible_path = os.path.join(stored_icons_path, f"{id_}{ext}")
+                if os.path.exists(possible_path):
+                    icon_path = possible_path
+                    break
+            if icon_path:
                 href = doc.addPicture(icon_path)
                 image_frame = Frame(width="10cm", height="10cm", x="2cm", y="4cm", anchortype="page")
                 image = Image(href=href, type="simple", show="embed", actuate="onLoad")
@@ -1764,16 +1786,23 @@ class PasswordManager(ctk.CTk):
         if not self._verify_master_password():
             return
         prs = Presentation()
-        rows = self.c.execute("SELECT id, title, username, password, notes, icon_path FROM passwords").fetchall()
+        rows = self.c.execute("SELECT id, title, username, password, notes FROM passwords").fetchall()
         for row in rows:
-            id_, title, user, pwd_enc, notes, icon_path = row
+            id_, title, user, pwd_enc, notes = row
             try:
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
             except Exception:
                 pwd = ""
             slide_layout = prs.slide_layouts[6] # blank slide
             slide = prs.slides.add_slide(slide_layout)
-            if icon_path and os.path.exists(icon_path):
+            # Search for icon by file name
+            icon_path = None
+            for ext in ['.png', '.jpg', '.jpeg']:
+                possible_path = os.path.join(stored_icons_path, f"{id_}{ext}")
+                if os.path.exists(possible_path):
+                    icon_path = possible_path
+                    break
+            if icon_path:
                 slide.shapes.add_picture(icon_path, Inches(1), Inches(1), Inches(5), Inches(5))
             txBox = slide.shapes.add_textbox(Inches(7), Inches(1), Inches(5), Inches(5))
             tf = txBox.text_frame
