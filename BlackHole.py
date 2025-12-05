@@ -478,16 +478,28 @@ class PasswordManager(ctk.CTk):
         self.deiconify()
         self.lift()
     def copy_pinned(self, id_):
-        if self._verify_master_password():
+        # Use master-password verification and show icon in the modal when copying from tray
+        if self._verify_master_password(icon_id=id_):
             row = self.c.execute("SELECT title, password FROM passwords WHERE id=?", (id_,)).fetchone()
             if row:
                 title, pwd_enc = row
                 pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-                if messagebox.askyesno("Confirm Copy", f"Are you sure you want to copy the password for '{title}' to the clipboard?"):
+                # Copy silently and show non-blocking notification
+                try:
                     self.clipboard_clear()
                     self.clipboard_append(pwd)
                     if platform.system() == "Windows":
                         self.show_balloon("Copied", "Password copied to clipboard!")
+                    else:
+                        # Fallback: show a brief non-blocking in-app label
+                        try:
+                            notif = ctk.CTkLabel(self, text="Password copied to clipboard!", fg_color=ACCENT, text_color=BG)
+                            notif.place(relx=0.5, y=8, anchor="n")
+                            self.after(1800, notif.destroy)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
     def show_balloon(self, title, msg):
         nid = NOTIFYICONDATA()
         nid.cbSize = sizeof(NOTIFYICONDATA)
@@ -863,7 +875,7 @@ class PasswordManager(ctk.CTk):
     def _show_master_password_modal(self):
         # This is for normal unlock after setup
         return self._show_master_unlock_modal()
-    def _verify_master_password(self):
+    def _verify_master_password(self, icon_id=None):
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
         popup.title("Black Hole - Master Password")
@@ -877,11 +889,44 @@ class PasswordManager(ctk.CTk):
             popup.grab_release()
             popup.destroy()
         popup.protocol("WM_DELETE_WINDOW", on_close)
-        ctk.CTkLabel(popup, text="Verify Master Password",
-                     font=("Nunito", 16, "bold"),
-                     text_color=TEXT, fg_color=BG).pack(pady=(16,6))
-        ctk.CTkLabel(popup, text="Enter your master password to proceed",
-                     text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+        # If an icon id was provided (e.g. copying from tray), try to load and show a small icon
+        if icon_id is not None:
+            try:
+                icon_path = None
+                for ext in ['.png', '.jpg', '.jpeg']:
+                    possible = os.path.join(stored_icons_path, f"{icon_id}{ext}")
+                    if os.path.exists(possible):
+                        icon_path = possible
+                        break
+                if icon_path:
+                    pil_img = Image.open(icon_path)
+                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(48, 48))
+                    header_frame = ctk.CTkFrame(popup, fg_color=BG)
+                    header_frame.pack(pady=(12,6))
+                    ctk.CTkLabel(header_frame, image=ctk_img, text="").pack(side="left", padx=(8,12))
+                    ctk.CTkLabel(header_frame, text="Verify Master Password",
+                                 font=("Nunito", 14, "bold"),
+                                 text_color=TEXT, fg_color=BG).pack(side="left")
+                    ctk.CTkLabel(popup, text="Enter your master password to proceed",
+                                 text_color=ACCENT_DIM, fg_color=BG).pack(pady=(6,8))
+                else:
+                    ctk.CTkLabel(popup, text="Verify Master Password",
+                                 font=("Nunito", 16, "bold"),
+                                 text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+                    ctk.CTkLabel(popup, text="Enter your master password to proceed",
+                                 text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+            except Exception:
+                ctk.CTkLabel(popup, text="Verify Master Password",
+                             font=("Nunito", 16, "bold"),
+                             text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+                ctk.CTkLabel(popup, text="Enter your master password to proceed",
+                             text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+        else:
+            ctk.CTkLabel(popup, text="Verify Master Password",
+                         font=("Nunito", 16, "bold"),
+                         text_color=TEXT, fg_color=BG).pack(pady=(16,6))
+            ctk.CTkLabel(popup, text="Enter your master password to proceed",
+                         text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
         frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
         frame.pack(padx=20, pady=8, fill="both", expand=False)
         pwd_var = StringVar()
@@ -986,6 +1031,38 @@ class PasswordManager(ctk.CTk):
                 self.c.execute("ALTER TABLE passwords_new RENAME TO passwords")
                 self.conn.commit()
         except Exception as e:
+            pass
+        # Clean up any orphaned stored icons not associated with DB ids
+        try:
+            self._cleanup_orphaned_icons()
+        except Exception:
+            pass
+    def _cleanup_orphaned_icons(self):
+        """Remove image files in `stored_icons_path` that are not associated with any password id in the DB."""
+        try:
+            # Fetch all ids from the passwords table
+            self.c.execute("SELECT id FROM passwords")
+            rows = self.c.fetchall()
+            valid_ids = {str(r[0]) for r in rows}
+            # Allowed image extensions
+            exts = {'.png', '.jpg', '.jpeg'}
+            for fname in os.listdir(stored_icons_path):
+                try:
+                    base, ext = os.path.splitext(fname)
+                    if ext.lower() not in exts:
+                        continue
+                    # If basename is not a valid id, remove the file
+                    if base not in valid_ids:
+                        path = os.path.join(stored_icons_path, fname)
+                        try:
+                            os.remove(path)
+                        except Exception:
+                            pass
+                except Exception:
+                    # Ignore malformed filenames
+                    pass
+        except Exception:
+            # If DB not ready or other error, silently skip cleanup
             pass
     # --- Save Order ---
     def _save_order(self):
