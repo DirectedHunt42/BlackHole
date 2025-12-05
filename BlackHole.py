@@ -152,7 +152,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.6.5"
+VERSION = "1.6.6"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1037,7 +1037,20 @@ class PasswordManager(ctk.CTk):
         self.search_var = StringVar()
         self.search_entry = ctk.CTkEntry(search_subframe, textvariable=self.search_var, placeholder_text="by title")
         self.search_entry.pack(side="left", fill="x", expand=True)
-        self.search_entry.bind("<KeyRelease>", lambda e: self.load_cards())
+        self.search_entry.bind("<Return>", lambda e: self.load_cards())
+        self.search_entry.bind("<KeyRelease>", lambda e: self._update_search_buttons())
+        
+        # Search button
+        self.search_btn = ctk.CTkButton(search_subframe, text="🔎", command=self.load_cards, 
+                                         fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=32, font=("Nunito", 12))
+        self.search_btn.pack(side="left", padx=(5, 2))
+        
+        # Clear button
+        self.clear_search_btn = ctk.CTkButton(search_subframe, text="❌", command=self._clear_search,
+                                               fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=32, font=("Nunito", 12))
+        self.clear_search_btn.pack(side="left", padx=(2, 0))
+        
+        self._update_search_buttons()
         # Sort options
         sort_frame = ctk.CTkFrame(header, fg_color=BG)
         sort_frame.pack(side="right", padx=12)
@@ -1262,8 +1275,15 @@ class PasswordManager(ctk.CTk):
                 del self.edit_order_btn
     # --- Load Cards ---
     def load_cards(self):
+        """Only rebuild cards in the cards_frame, not the entire UI"""
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
+        self._rebuild_cards()
+        # Scroll to top
+        self.cards_frame._parent_canvas.yview_moveto(0)
+    
+    def _rebuild_cards(self):
+        """Internal method that rebuilds the cards grid"""
         search_term = self.search_var.get().strip().lower()
         if self.order_mode == "default":
             self.c.execute("SELECT id, title, username, password, notes FROM passwords ORDER BY id DESC")
@@ -1364,6 +1384,22 @@ class PasswordManager(ctk.CTk):
             ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Nunito", 10)).pack(pady=2) # Added Notes button
             ctk.CTkButton(righter, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
                         fg_color="#7a2d2d", font=("Nunito", 10)).pack(pady=2) # Increased font size
+    # --- Search Helper Methods ---
+    def _update_search_buttons(self):
+        """Show/hide search and clear buttons based on search text"""
+        has_text = bool(self.search_var.get().strip())
+        if has_text:
+            self.search_btn.pack(side="left", padx=(5, 2))
+            self.clear_search_btn.pack(side="left", padx=(2, 0))
+        else:
+            self.search_btn.pack_forget()
+            self.clear_search_btn.pack_forget()
+    
+    def _clear_search(self):
+        """Clear the search entry and reload cards"""
+        self.search_var.set("")
+        self._update_search_buttons()
+        self.load_cards()
     # --- Create Card ---
     def create_new_card(self):
         popup = ctk.CTkToplevel(self)
