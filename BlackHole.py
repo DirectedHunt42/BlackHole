@@ -152,7 +152,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.6.6"
+VERSION = "1.6.7"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1303,6 +1303,7 @@ class PasswordManager(ctk.CTk):
             id_to_row = {r[0]: r for r in rows}
             rows = [id_to_row[id_] for id_ in self.custom_order if id_ in id_to_row]
         rows = self.c.fetchall() if self.order_mode != "custom" else rows
+        all_rows = rows  # Store original rows before filtering
         if search_term:
             rows = [r for r in rows if search_term in r[1].lower()]
         match(self.winfo_screenwidth()):
@@ -1319,6 +1320,22 @@ class PasswordManager(ctk.CTk):
             case _:
                 num_columns = 1
         self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
+        
+        # Show appropriate message if empty
+        if not rows:
+            no_results_frame = ctk.CTkFrame(self.cards_frame, fg_color=BG)
+            no_results_frame.grid(row=0, column=0, columnspan=num_columns, sticky="nsew", padx=20, pady=40)
+            
+            if not all_rows:
+                # Database is completely empty
+                ctk.CTkLabel(no_results_frame, text="No passwords yet", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
+                ctk.CTkLabel(no_results_frame, text="Click the ➕ button to add your first entry", font=("Nunito", 12), text_color=ACCENT_DIM).pack()
+            else:
+                # Database has entries but search returned no results
+                ctk.CTkLabel(no_results_frame, text="No results found", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
+                ctk.CTkLabel(no_results_frame, text="Try adjusting your search", font=("Nunito", 12), text_color=ACCENT_DIM).pack()
+            return
+        
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes = row
             try:
