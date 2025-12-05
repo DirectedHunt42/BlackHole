@@ -132,9 +132,83 @@ if platform.system() == "Windows":
     mutex = kernel32.CreateMutexW(None, True, mutex_name)
     err = kernel32.GetLastError()
     if err == ERROR_ALREADY_EXISTS:
-        hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
+        # Try to find the existing window. First try exact match, then enumerate windows by process exe name
+        hwnd = None
+        try:
+            hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
+        except Exception:
+            hwnd = None
+
+        if not hwnd:
+            # Enumerate top-level windows and match by process executable name
+            found = {"hwnd": None}
+            EnumWindowsProc = WINFUNCTYPE(BOOL, HWND, LPARAM)
+            # Prepare function prototypes we will use
+            try:
+                user32.EnumWindows.argtypes = [EnumWindowsProc, LPARAM]
+            except Exception:
+                pass
+            try:
+                user32.GetWindowThreadProcessId.argtypes = [HWND, POINTER(DWORD)]
+            except Exception:
+                pass
+            # Process access flags
+            PROCESS_QUERY_INFORMATION = 0x0400
+            PROCESS_VM_READ = 0x0010
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            desired_access = PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
+            # Current executable basename
+            try:
+                our_exe = os.path.basename(sys.executable).lower()
+            except Exception:
+                our_exe = None
+            def _enum_proc(h, lparam):
+                try:
+                    # Skip invisible windows
+                    if not user32.IsWindowVisible(h):
+                        return True
+                    pid = DWORD()
+                    user32.GetWindowThreadProcessId(h, byref(pid))
+                    p = pid.value
+                    if p == 0:
+                        return True
+                    # Open process to get executable name
+                    try:
+                        ph = kernel32.OpenProcess(desired_access, False, p)
+                        if not ph:
+                            # Try limited info access
+                            ph = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, p)
+                        if ph:
+                            # Query full image name
+                            buf_len = DWORD(260)
+                            buf = create_unicode_buffer(buf_len.value)
+                            if kernel32.QueryFullProcessImageNameW(ph, 0, buf, byref(buf_len)):
+                                exe_path = buf.value
+                                exe_base = os.path.basename(exe_path).lower()
+                                if our_exe and exe_base == our_exe:
+                                    found['hwnd'] = h
+                                    kernel32.CloseHandle(ph)
+                                    return False
+                            try:
+                                kernel32.CloseHandle(ph)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                return True
+            try:
+                user32.EnumWindows(EnumWindowsProc(_enum_proc), 0)
+                hwnd = found.get("hwnd")
+            except Exception:
+                hwnd = None
+
         if hwnd:
-            user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
+            try:
+                user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
+            except Exception:
+                pass
         sys.exit(0)
 # Set working directory to the script/exe directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
