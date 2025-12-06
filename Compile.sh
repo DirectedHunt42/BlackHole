@@ -119,6 +119,12 @@ if [[ "$COMPILE_BLACK_HOLE" == "YES" ]]; then
         "$SCRIPT_DIR/$BLACK_HOLE_SCRIPT" || true
 
     echo "Successfully compiled $BLACK_HOLE_SCRIPT → $OUTPUT_DIR"
+    
+    # Make the output executable
+    if [[ -f "$OUTPUT_DIR/$BLACK_HOLE_BUILD_NAME" ]]; then
+        chmod +x "$OUTPUT_DIR/$BLACK_HOLE_BUILD_NAME"
+        echo "Made executable: $OUTPUT_DIR/$BLACK_HOLE_BUILD_NAME"
+    fi
 fi
 
 echo
