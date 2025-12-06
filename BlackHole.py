@@ -217,7 +217,6 @@ os.chdir(SCRIPT_DIR)
 APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
 APP_ICON_PATH_LINUX = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.png")
 BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
-BLACK_HOLE_WIDE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide.png")
 NOVA_FOUNDRY_LOGO = os.path.join(SCRIPT_DIR, "Icons", "Nova_foundry_wide_transparent.png")
 FONT_REGULAR = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Regular.ttf")
 FONT_MEDIUM = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Medium.ttf")
@@ -226,7 +225,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.6.7"
+VERSION = "1.7.0"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -248,13 +247,36 @@ os.makedirs(stored_icons_path, exist_ok=True)
 settings_path = os.path.join(nova_folder, "settings.json")
 order_path = os.path.join(nova_folder, "order.json")
 pinned_path = os.path.join(nova_folder, "pinned.json")
-# --- Theme (Deep Space Glow) colours ---
-BG = "#05050a"
-CARD = "#0b0b0f"
-CARD_HOVER = "#111327"
-ACCENT = "#47a3ff"
-ACCENT_DIM = "#2b6f9f"
-TEXT = "#e6eef8"
+# --- Themes ---
+THEMES = {
+    "dark": {
+        "BG": "#05050a",
+        "CARD": "#0b0b0f",
+        "CARD_HOVER": "#111327",
+        "ACCENT": "#47a3ff",
+        "ACCENT_DIM": "#2b6f9f",
+        "TEXT": "#e6eef8",
+        "BLACK_HOLE_WIDE_LOGO": os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide.png"),
+    },
+    "light": {
+        "BG": "#f5f5f5",
+        "CARD": "#ffffff",
+        "CARD_HOVER": "#efefef",
+        "ACCENT": "#0066cc",
+        "ACCENT_DIM": "#6699cc",
+        "TEXT": "#1a1a1a",
+        "BLACK_HOLE_WIDE_LOGO": os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Wide_Dark.png"),
+    }
+}
+# Default to dark theme (will be overridden by settings)
+current_theme = "dark"
+BG = THEMES["dark"]["BG"]
+CARD = THEMES["dark"]["CARD"]
+CARD_HOVER = THEMES["dark"]["CARD_HOVER"]
+ACCENT = THEMES["dark"]["ACCENT"]
+ACCENT_DIM = THEMES["dark"]["ACCENT_DIM"]
+TEXT = THEMES["dark"]["TEXT"]
+BLACK_HOLE_WIDE_LOGO = THEMES["dark"]["BLACK_HOLE_WIDE_LOGO"]
 # --- Tooltip Class (Fixed version with delay to prevent sticking) ---
 class Tooltip:
     def __init__(self, widget, text, wait_time=500):
@@ -344,11 +366,23 @@ class PasswordManager(ctk.CTk):
     
     def __init__(self):
         super().__init__()
-        ctk.set_appearance_mode("dark")
-        try:
-            ctk.set_default_color_theme("dark-blue")
-        except Exception:
-            pass
+        # load settings first (to get theme preference)
+        self.settings = {"master_password_set": False}
+        if os.path.exists(settings_path):
+            try:
+                with open(settings_path, "r") as f:
+                    self.settings = json.load(f)
+                if "salt" in self.settings:
+                    self.salt = urlsafe_b64decode(self.settings["salt"])
+                if "db_path" in self.settings:
+                    self.db_path = self.settings["db_path"]
+            except Exception:
+                self.settings = {"master_password_set": False}
+        
+        # Apply theme based on settings (default to 'system' if not set)
+        theme_pref = self.settings.get("theme", "system")
+        self._apply_theme(theme_pref)
+        
         # Hide main window until auth succeeds
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
@@ -1163,6 +1197,36 @@ class PasswordManager(ctk.CTk):
                 json.dump(self.settings, f)
         except Exception:
             pass
+    # --- Apply Theme ---
+    def _apply_theme(self, theme_mode):
+        """Apply theme based on mode: 'light', 'dark', or 'system'"""
+        global current_theme, BG, CARD, CARD_HOVER, ACCENT, ACCENT_DIM, TEXT, BLACK_HOLE_WIDE_LOGO
+        
+        if theme_mode == "system":
+            # Use CTK default appearance (respects system settings)
+            ctk.set_appearance_mode("system")
+            current_theme = "dark"  # Default fallback
+        elif theme_mode == "light":
+            ctk.set_appearance_mode("light")
+            current_theme = "light"
+        else:  # "dark" or any other value defaults to dark
+            ctk.set_appearance_mode("dark")
+            current_theme = "dark"
+        
+        # Update global color variables
+        theme_colors = THEMES[current_theme]
+        BG = theme_colors["BG"]
+        CARD = theme_colors["CARD"]
+        CARD_HOVER = theme_colors["CARD_HOVER"]
+        ACCENT = theme_colors["ACCENT"]
+        ACCENT_DIM = theme_colors["ACCENT_DIM"]
+        TEXT = theme_colors["TEXT"]
+        BLACK_HOLE_WIDE_LOGO = theme_colors["BLACK_HOLE_WIDE_LOGO"]
+        
+        try:
+            ctk.set_default_color_theme("dark-blue")
+        except Exception:
+            pass
     # --- Build UI ---
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=BG, height=64)
@@ -1354,6 +1418,14 @@ class PasswordManager(ctk.CTk):
         if self.settings.get("minimize_to_tray", False):
             tray_var.select()
         tray_var.configure(command=lambda: self.toggle_tray(tray_var.get()))
+        # Theme selector
+        ctk.CTkLabel(frame, text="Theme:", text_color=TEXT).pack(anchor="w", padx=10, pady=(10,4))
+        theme_pref = self.settings.get("theme", "system")
+        theme_var = ctk.StringVar(value=theme_pref)
+        theme_options = ["light", "dark", "system"]
+        theme_combo = ctk.CTkComboBox(frame, values=theme_options, variable=theme_var, width=200, font=("Nunito", 11))
+        theme_combo.pack(padx=10, pady=(0,10))
+        theme_combo.configure(command=lambda val: self.toggle_theme(val))
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
@@ -1402,6 +1474,13 @@ class PasswordManager(ctk.CTk):
                 pass
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to remove from startup: {e}")
+    def toggle_theme(self, theme_mode):
+        """Change theme and save preference"""
+        self.settings["theme"] = theme_mode
+        self._save_settings()
+        self._apply_theme(theme_mode)
+        messagebox.showinfo("Theme Changed", f"Theme changed to {theme_mode.capitalize()}. The app will fully apply the new theme on next launch.")
+        os._exit(1)
     def _change_sort(self, event=None):
         val = self.sort_var.get()
         if val == "Title A-Z":
@@ -2025,7 +2104,7 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         PasswordManager.set_window_icon(popup)
-        pil_image_bh = Image.open(BLACK_HOLE_LOGO)
+        pil_image_bh = Image.open(BLACK_HOLE_WIDE_LOGO)
         bh_width, bh_height = pil_image_bh.size
         new_width_bh = 200
         new_height_bh = int((new_width_bh / bh_width) * bh_height)
