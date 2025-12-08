@@ -225,7 +225,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1299,6 +1299,10 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         import_btn.pack(side="right", padx=4)
         Tooltip(import_btn, "Import from Spreadsheet")
+        help_btn = ctk.CTkButton(header, text="❓", command=self.show_help,
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        help_btn.pack(side="right", padx=4)
+        Tooltip(help_btn, "Help")
         about_btn = ctk.CTkButton(header, text="ℹ️", command=self.show_about,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         about_btn.pack(side="right", padx=4)
@@ -2097,6 +2101,9 @@ class PasswordManager(ctk.CTk):
         if path:
             prs.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
+    def show_help(self):
+        help_url = "https://github.com/DirectedHunt42/BlackHole/wiki"
+        webbrowser.open_new(help_url)
     #--- About Popup ---
     def show_about(self):
         popup = ctk.CTkToplevel(self)
