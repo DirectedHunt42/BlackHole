@@ -224,7 +224,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -2214,6 +2214,28 @@ class PasswordManager(ctk.CTk):
                 pass
             self.after(100, process_queue)
         self.after(100, process_queue)
+    def check_for_update(self):
+        q = queue.Queue()
+        def check_task():
+            try:
+                url = "https://api.github.com/repos/DirectedHunt42/BlackHole/releases/latest"
+                req = urllib.request.Request(url, headers={'User-Agent': 'EchoHub', 'Accept': 'application/vnd.github.v3+json'})
+                with urllib.request.urlopen(req) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                q.put(data)
+            except:
+                q.put(None)
+        threading.Thread(target=check_task, daemon=True).start()
+        def process_queue():
+            try:
+                data = q.get_nowait()
+                if data:
+                    self.do_update_confirm(data)
+            except queue.Empty:
+                pass
+            self.after(100, process_queue)
+        self.after(100, process_queue)
+
     def do_update_confirm(self, data):
         try:
             title = data.get('name', '').strip()
@@ -2239,43 +2261,57 @@ class PasswordManager(ctk.CTk):
                         webbrowser.open_new("https://github.com/DirectedHunt42/BlackHole/releases")
         except Exception as e:
             print(f"Update check failed: {e}")
+
     def download_and_install(self, data):
         progress_popup = ctk.CTkToplevel(self)
-        progress_popup.grab_set()
         progress_popup.title("Downloading Update")
         progress_popup.configure(fg_color=BG)
         progress_popup.resizable(False, False)
         PasswordManager.set_window_icon(progress_popup)
         ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
+        download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
+        download_bar.pack(pady=(0,12))
         center_popup(progress_popup)
         progress_popup.update()
         progress_popup.grab_set()
-        self.wait_window(progress_popup)
-        download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
-        download_bar.pack(pady=(0,12))
         download_bar.start()
-        progress_popup.update()
-        try:
-            assets = data.get('assets', [])
-            download_url = None
-            for asset in assets:
-                if asset.get('name','') == 'Black_hole_setup.exe':
-                    download_url = asset.get('browser_download_url', None)
-                    break
-            if not download_url:
-                raise Exception("No matching asset found")
-            temp_path = os.path.join(os.getenv("TEMP") or ".", "Black_hole_setup.exe")
-            req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
-            with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
-                shutil.copyfileobj(response, out_file)
-            download_bar.stop()
-            progress_popup.destroy()
-            os.startfile(temp_path)
-            self.quit()
-        except Exception as e:
-            download_bar.stop()
-            progress_popup.destroy()
-            messagebox.showerror("Error", f"Failed to download update: {str(e)}")
+        
+        q = queue.Queue()
+        def download_task():
+            try:
+                assets = data.get('assets', [])
+                download_url = None
+                for asset in assets:
+                    if asset.get('name','') == 'Black_hole_setup.exe':
+                        download_url = asset.get('browser_download_url', None)
+                        break
+                if not download_url:
+                    raise Exception("No matching asset found")
+                temp_path = os.path.join(os.getenv("TEMP") or ".", "Black_hole_setup.exe")
+                req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
+                with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
+                    shutil.copyfileobj(response, out_file)
+                q.put(('success', temp_path))
+            except Exception as e:
+                q.put(('error', str(e)))
+        
+        threading.Thread(target=download_task, daemon=True).start()
+        
+        def process_queue():
+            try:
+                result = q.get_nowait()
+                download_bar.stop()
+                progress_popup.destroy()
+                if result[0] == 'success':
+                    os.startfile(result[1])
+                    self.quit()
+                else:
+                    messagebox.showerror("Error", f"Failed to download update: {result[1]}")
+            except queue.Empty:
+                self.after(100, process_queue)
+        
+        self.after(100, process_queue)
+        self.wait_window(progress_popup)
 # --- Run App ---
 if __name__ == "__main__":
     app = PasswordManager()
