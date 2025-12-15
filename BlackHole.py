@@ -27,6 +27,7 @@ import pandas as pd
 from pptx import Presentation
 from pptx.util import Inches
 import platform
+import darkdetect
 if platform.system() == "Windows":
     from ctypes import *
     from ctypes.wintypes import *
@@ -138,7 +139,6 @@ if platform.system() == "Windows":
             hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
         except Exception:
             hwnd = None
-
         if not hwnd:
             # Enumerate top-level windows and match by process executable name
             found = {"hwnd": None}
@@ -203,7 +203,6 @@ if platform.system() == "Windows":
                 hwnd = found.get("hwnd")
             except Exception:
                 hwnd = None
-
         if hwnd:
             try:
                 user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
@@ -340,7 +339,6 @@ class PasswordManager(ctk.CTk):
                 window.after(250, lambda: window.iconbitmap(APP_ICON_PATH))
             except:
                 pass
-
         elif platform.system() == "Linux":
             icon_path_xbm = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.xbm")
             if os.path.exists(icon_path_xbm):
@@ -358,12 +356,11 @@ class PasswordManager(ctk.CTk):
                     window.iconphoto(True, ctk.CTkImage(light_image=img, dark_image=img))
                 except:
                     pass
-
         elif platform.system() == "Darwin":
             if os.path.exists(APP_ICON_PATH_LINUX):
                 img = Image.open(APP_ICON_PATH_LINUX)
                 window.iconphoto(True, ImageTk.PhotoImage(img))
-    
+   
     def __init__(self):
         super().__init__()
         # load settings first (to get theme preference)
@@ -378,11 +375,11 @@ class PasswordManager(ctk.CTk):
                     self.db_path = self.settings["db_path"]
             except Exception:
                 self.settings = {"master_password_set": False}
-        
+       
         # Apply theme based on settings (default to 'system' if not set)
         theme_pref = self.settings.get("theme", "system")
         self._apply_theme(theme_pref)
-        
+       
         # Hide main window until auth succeeds
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
@@ -548,6 +545,15 @@ class PasswordManager(ctk.CTk):
             id_ = self.pinned[cmd - 2000]
             self.copy_pinned(id_)
     def show_tray_menu(self):
+        try:
+            uxtheme = ctypes.windll.uxtheme
+            SetPreferredAppMode = uxtheme[135]
+            FlushMenuThemes = uxtheme[132]
+            mode = 2 if darkdetect.isDark() else 1
+            SetPreferredAppMode(mode)
+            FlushMenuThemes()
+        except:
+            pass
         menu = user32.CreatePopupMenu()
         pinned_menu = user32.CreatePopupMenu()
         # Pinned items
@@ -578,7 +584,6 @@ class PasswordManager(ctk.CTk):
             self._build_ui()
             self.load_cards()
             self.ui_built = True
-
         if platform.system() == "Windows":
             self.after(250, lambda: self.state('zoomed'))
         else:
@@ -1028,7 +1033,7 @@ class PasswordManager(ctk.CTk):
                              font=("Nunito", 16, "bold"),
                              text_color=TEXT, fg_color=BG).pack(pady=(16,6))
                 ctk.CTkLabel(popup, text="Enter your master password to proceed",
-                             text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
+                                 text_color=ACCENT_DIM, fg_color=BG).pack(pady=(0,12))
         else:
             ctk.CTkLabel(popup, text="Verify Master Password",
                          font=("Nunito", 16, "bold"),
@@ -1201,18 +1206,18 @@ class PasswordManager(ctk.CTk):
     def _apply_theme(self, theme_mode):
         """Apply theme based on mode: 'light', 'dark', or 'system'"""
         global current_theme, BG, CARD, CARD_HOVER, ACCENT, ACCENT_DIM, TEXT, BLACK_HOLE_WIDE_LOGO
-        
+       
         if theme_mode == "system":
             # Use CTK default appearance (respects system settings)
             ctk.set_appearance_mode("system")
-            current_theme = "dark"  # Default fallback
         elif theme_mode == "light":
             ctk.set_appearance_mode("light")
-            current_theme = "light"
-        else:  # "dark" or any other value defaults to dark
+        else: # "dark" or any other value defaults to dark
             ctk.set_appearance_mode("dark")
-            current_theme = "dark"
-        
+       
+        # Detect the actual appearance mode
+        current_theme = "dark" if ctk.get_appearance_mode() == "Dark" else "light"
+       
         # Update global color variables
         theme_colors = THEMES[current_theme]
         BG = theme_colors["BG"]
@@ -1222,7 +1227,7 @@ class PasswordManager(ctk.CTk):
         ACCENT_DIM = theme_colors["ACCENT_DIM"]
         TEXT = theme_colors["TEXT"]
         BLACK_HOLE_WIDE_LOGO = theme_colors["BLACK_HOLE_WIDE_LOGO"]
-        
+       
         try:
             ctk.set_default_color_theme("dark-blue")
         except Exception:
@@ -1254,17 +1259,17 @@ class PasswordManager(ctk.CTk):
         self.search_entry.pack(side="left", fill="x", expand=True)
         self.search_entry.bind("<Return>", lambda e: self.load_cards())
         self.search_entry.bind("<KeyRelease>", lambda e: self._update_search_buttons())
-        
+       
         # Search button
-        self.search_btn = ctk.CTkButton(search_subframe, text="🔎", command=self.load_cards, 
+        self.search_btn = ctk.CTkButton(search_subframe, text="🔎", command=self.load_cards,
                                          fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=32, font=("Nunito", 12))
         self.search_btn.pack(side="left", padx=(5, 2))
-        
+       
         # Clear button
         self.clear_search_btn = ctk.CTkButton(search_subframe, text="❌", command=self._clear_search,
                                                fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=32, font=("Nunito", 12))
         self.clear_search_btn.pack(side="left", padx=(2, 0))
-        
+       
         self._update_search_buttons()
         # Sort options
         sort_frame = ctk.CTkFrame(header, fg_color=BG)
@@ -1515,7 +1520,7 @@ class PasswordManager(ctk.CTk):
         self._rebuild_cards()
         # Scroll to top
         self.cards_frame._parent_canvas.yview_moveto(0)
-    
+   
     def _rebuild_cards(self):
         """Internal method that rebuilds the cards grid"""
         search_term = self.search_var.get().strip().lower()
@@ -1537,7 +1542,7 @@ class PasswordManager(ctk.CTk):
             id_to_row = {r[0]: r for r in rows}
             rows = [id_to_row[id_] for id_ in self.custom_order if id_ in id_to_row]
         rows = self.c.fetchall() if self.order_mode != "custom" else rows
-        all_rows = rows  # Store original rows before filtering
+        all_rows = rows # Store original rows before filtering
         if search_term:
             rows = [r for r in rows if search_term in r[1].lower()]
         match(self.winfo_screenwidth()):
@@ -1554,12 +1559,12 @@ class PasswordManager(ctk.CTk):
             case _:
                 num_columns = 1
         self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
-        
+       
         # Show appropriate message if empty
         if not rows:
             no_results_frame = ctk.CTkFrame(self.cards_frame, fg_color=BG)
             no_results_frame.grid(row=0, column=0, columnspan=num_columns, sticky="nsew", padx=20, pady=40)
-            
+           
             if not all_rows:
                 # Database is completely empty
                 ctk.CTkLabel(no_results_frame, text="No passwords yet", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
@@ -1569,7 +1574,7 @@ class PasswordManager(ctk.CTk):
                 ctk.CTkLabel(no_results_frame, text="No results found", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
                 ctk.CTkLabel(no_results_frame, text="Try adjusting your search", font=("Nunito", 12), text_color=ACCENT_DIM).pack()
             return
-        
+       
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes = row
             try:
@@ -1608,33 +1613,41 @@ class PasswordManager(ctk.CTk):
             title_label = ctk.CTkLabel(left, text=title or "(No title)", anchor="w",
                         font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=CARD, width=50, wraplength=200) # Increased font size
             title_label.pack(anchor="w")
-            user_label = ctk.CTkLabel(left, text=f"User: {user or ''}", anchor="w",
-                        text_color=ACCENT_DIM, fg_color=CARD, font=("Nunito", 12), width=50, wraplength=200) # Increased font size
-            user_label.pack(anchor="w")
-            pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
-            pwd_label = ctk.CTkLabel(left, textvariable=pwd_var, anchor="w", text_color=TEXT, fg_color=CARD, font=("Nunito", 12), width=50, wraplength=200) # Increased font size
-            pwd_label.pack(anchor="w")
             def copy_text(text, msg="Copied to clipboard!"):
                 if text:
                     self.clipboard_clear()
                     self.clipboard_append(text)
                     messagebox.showinfo("Copied", msg)
+            # Username with outline and copy symbol
+            user_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
+            user_frame.pack(fill="x", pady=2)
+            user_label = ctk.CTkLabel(user_frame, text=f"🗐 User: {user or ''}", anchor="w",
+                        text_color=ACCENT_DIM, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
+            user_frame.pack_propagate(0)
+            user_label.pack(side="left", padx=4)
             user_label.bind("<Button-1>", lambda e, u=user: copy_text(u, "Username copied!"))
+            # Password with outline and copy symbol
+            pwd_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
+            pwd_frame.pack(fill="x", pady=2)
+            pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
+            pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w", text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
+            pwd_frame.pack_propagate(0)
+            pwd_label.pack(side="left", padx=4)
             pwd_label.bind("<Button-1>", lambda e, p=pwd: copy_text(p, "Password copied!"))
-            right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0)
+            right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0, height=150)
             right.pack(side="right", padx=4, pady=4)
             righter = ctk.CTkFrame(right, fg_color=CARD, corner_radius=0)
             righter.pack(side="right", padx=4, pady=0)
             def toggle_show(pw=pwd, var=pwd_var):
                 var.set(pw if var.get().startswith("*") else "*"*len(pw))
             ctk.CTkButton(right, text="Show", command=toggle_show,
-                        width=60, fg_color=ACCENT, text_color=BG, font=("Nunito", 10)).pack(pady=2) # Increased font size
-            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=60, font=("Nunito", 10)).pack(pady=2) # Increased font size
+                        width=50, fg_color=ACCENT, text_color=BG, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
+            ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=50, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
             def show_notes(n=notes):
                 messagebox.showinfo("Notes", n or "No notes")
-            ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=60, font=("Nunito", 10)).pack(pady=2) # Added Notes button
-            ctk.CTkButton(righter, text="Delete", command=lambda id=id_: self.delete_card(id), width=60,
-                        fg_color="#7a2d2d", font=("Nunito", 10)).pack(pady=2) # Increased font size
+            ctk.CTkButton(righter, text="Notes", command=lambda n=notes: show_notes(n), width=50, font=("Nunito", 10), height=40).pack(pady=2) # Added Notes button
+            ctk.CTkButton(righter, text="Delete", command=lambda id=id_: self.delete_card(id), width=50,
+                        fg_color="#7a2d2d", font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
     # --- Search Helper Methods ---
     def _update_search_buttons(self):
         """Show/hide search and clear buttons based on search text"""
@@ -1645,7 +1658,7 @@ class PasswordManager(ctk.CTk):
         else:
             self.search_btn.pack_forget()
             self.clear_search_btn.pack_forget()
-    
+   
     def _clear_search(self):
         """Clear the search entry and reload cards"""
         self.search_var.set("")
@@ -1898,6 +1911,8 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(doc_btns, text=".txt", command=self.export_txt,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         sheet_btns = add_section(export_frame, "Spreadsheets")
+        ctk.CTkButton(sheet_btns, text=".xlsx", command=self.export_xlsx,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(sheet_btns, text=".xlsx", command=self.export_xlsx,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(sheet_btns, text=".ods", command=self.export_ods,

@@ -8,3 +8,4 @@ pywin32
 pandas
 openpyxl
 python-pptx
+darkdetect

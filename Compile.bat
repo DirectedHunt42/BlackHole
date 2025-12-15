@@ -102,6 +102,7 @@ set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=odf.opendocument"
 set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=odf.text"
 set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=urllib.request"
 set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=pptx"
+set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=darkdetect"
 REM Added for single-instance (pywin32)
 set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=win32event"
 set "HIDDEN_IMPORTS=!HIDDEN_IMPORTS! --hidden-import=win32api"

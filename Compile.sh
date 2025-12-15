@@ -85,6 +85,7 @@ HIDDEN_IMPORTS=(
     "--hidden-import=odf.text"
     "--hidden-import=urllib.request"
     "--hidden-import=pptx"
+    "--hidden-import=darkdetect"
     "--exclude-module=PIL._avif"
     "--upx-exclude=PIL/_imaging*.so"
     "--upx-exclude=PIL/_imagingtk*.so"
