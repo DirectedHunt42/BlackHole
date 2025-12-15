@@ -224,7 +224,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.7.2"
+VERSION = "1.7.3"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1323,7 +1323,7 @@ class PasswordManager(ctk.CTk):
         self.bind("<Control-s>", lambda e: self.export_popup())
         self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
         self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
-        self.check_for_update()
+        self.check_for_update(True)
     def import_spreadsheet(self):
         file_path = filedialog.askopenfilename(title="Select Spreadsheet", filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv")])
         if not file_path:
@@ -1437,6 +1437,7 @@ class PasswordManager(ctk.CTk):
         theme_combo.configure(command=lambda val: self.toggle_theme(val))
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
+        ctk.CTkButton(frame, text="Check for Updates", command=lambda: self.check_for_update(False), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
         ctk.CTkButton(popup, text="Close", command=lambda: popup.destroy(), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=12)
         safe_modal(popup)
@@ -2193,7 +2194,8 @@ class PasswordManager(ctk.CTk):
         messagebox.showinfo("Reset Complete", "App reset. Restart the application.")
         self.destroy()
         sys.exit()
-    def check_for_update(self):
+
+    def check_for_update(self, auto_check):
         q = queue.Queue()
         def check_task():
             try:
@@ -2209,34 +2211,13 @@ class PasswordManager(ctk.CTk):
             try:
                 data = q.get_nowait()
                 if data:
-                    self.do_update_confirm(data)
-            except queue.Empty:
-                pass
-            self.after(100, process_queue)
-        self.after(100, process_queue)
-    def check_for_update(self):
-        q = queue.Queue()
-        def check_task():
-            try:
-                url = "https://api.github.com/repos/DirectedHunt42/BlackHole/releases/latest"
-                req = urllib.request.Request(url, headers={'User-Agent': 'EchoHub', 'Accept': 'application/vnd.github.v3+json'})
-                with urllib.request.urlopen(req) as response:
-                    data = json.loads(response.read().decode('utf-8'))
-                q.put(data)
-            except:
-                q.put(None)
-        threading.Thread(target=check_task, daemon=True).start()
-        def process_queue():
-            try:
-                data = q.get_nowait()
-                if data:
-                    self.do_update_confirm(data)
+                    self.do_update_confirm(data, auto_check)
             except queue.Empty:
                 pass
             self.after(100, process_queue)
         self.after(100, process_queue)
 
-    def do_update_confirm(self, data):
+    def do_update_confirm(self, data, auto_check):
         try:
             title = data.get('name', '').strip()
             if title.lower().startswith("release "):
@@ -2259,6 +2240,9 @@ class PasswordManager(ctk.CTk):
                         self.download_and_install(data)
                     else:
                         webbrowser.open_new("https://github.com/DirectedHunt42/BlackHole/releases")
+            else:
+                if (auto_check == False):
+                    messagebox.showinfo("No Update", "You are using the latest version.")
         except Exception as e:
             print(f"Update check failed: {e}")
 
