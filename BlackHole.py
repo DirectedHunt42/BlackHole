@@ -224,7 +224,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.7.3"
+VERSION = "1.7.4"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1623,26 +1623,46 @@ class PasswordManager(ctk.CTk):
             user_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
             user_frame.pack(fill="x", pady=2)
             user_label = ctk.CTkLabel(user_frame, text=f"🗐 User: {user or ''}", anchor="w",
-                        text_color=ACCENT_DIM, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
+                                    text_color=ACCENT_DIM, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
             user_frame.pack_propagate(0)
             user_label.pack(side="left", padx=4)
             user_label.bind("<Button-1>", lambda e, u=user: copy_text(u, "Username copied!"))
+
             # Password with outline and copy symbol
             pwd_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
             pwd_frame.pack(fill="x", pady=2)
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
-            pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w", text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
+            # Note: pwd_label now holds the reference to the CTkLabel object
+            pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w", 
+                                    text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
             pwd_frame.pack_propagate(0)
             pwd_label.pack(side="left", padx=4)
             pwd_label.bind("<Button-1>", lambda e, p=pwd: copy_text(p, "Password copied!"))
+
             right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0, height=150)
             right.pack(side="right", padx=4, pady=4)
             righter = ctk.CTkFrame(right, fg_color=CARD, corner_radius=0)
             righter.pack(side="right", padx=4, pady=0)
-            def toggle_show(pw=pwd, var=pwd_var):
-                var.set(pw if var.get().startswith("*") else "*"*len(pw))
-            ctk.CTkButton(right, text="Show", command=toggle_show,
+
+            # FIX: Added 'label' parameter to accept the CTkLabel object
+            def toggle_show(pw=pwd, var=pwd_var, label=pwd_label):
+                # Determine the new display value
+                if var.get().startswith("*"):
+                    new_text = pw
+                else:
+                    new_text = "*"*len(pw)
+                    
+                # 1. Update the StringVar value
+                var.set(new_text)
+
+                # 2. CRUCIAL FIX: Update the label's text explicitly
+                label.configure(text=f"🗐 Password: {new_text}")
+                
+            # FIX: Use lambda to pass the necessary arguments, including the pwd_label object
+            ctk.CTkButton(right, text="Show", 
+                        command=lambda p=pwd, v=pwd_var, l=pwd_label: toggle_show(p, v, l),
                         width=50, fg_color=ACCENT, text_color=BG, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
+
             ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=50, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
             def show_notes(n=notes):
                 messagebox.showinfo("Notes", n or "No notes")
@@ -2288,7 +2308,7 @@ class PasswordManager(ctk.CTk):
                 progress_popup.destroy()
                 if result[0] == 'success':
                     os.startfile(result[1])
-                    self.quit()
+                    os._exit(0)
                 else:
                     messagebox.showerror("Error", f"Failed to download update: {result[1]}")
             except queue.Empty:
