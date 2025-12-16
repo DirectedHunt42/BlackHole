@@ -56,9 +56,6 @@ Your passwords are stored locally, encrypted, and protected by a single master p
 <div>
   <a href="https://info.flagcounter.com/TWw2"><img src="https://s01.flagcounter.com/count2/TWw2/bg_0B0F1A/txt_FFFFFF/border_FFFFFF/columns_4/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/" alt="Flag Counter" border="0"></a>
 </div>
-<img
-  src="https://github-readme-stats.vercel.app/api/top-langs/?username=DirectedHunt42&repo=BlackHole&theme=github_dark"
-/>
 
 ---
 
