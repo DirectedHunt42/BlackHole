@@ -360,7 +360,7 @@ class PasswordManager(ctk.CTk):
             if os.path.exists(APP_ICON_PATH_LINUX):
                 img = Image.open(APP_ICON_PATH_LINUX)
                 window.iconphoto(True, ImageTk.PhotoImage(img))
-   
+ 
     def __init__(self):
         super().__init__()
         # load settings first (to get theme preference)
@@ -375,11 +375,11 @@ class PasswordManager(ctk.CTk):
                     self.db_path = self.settings["db_path"]
             except Exception:
                 self.settings = {"master_password_set": False}
-       
+     
         # Apply theme based on settings (default to 'system' if not set)
         theme_pref = self.settings.get("theme", "system")
         self._apply_theme(theme_pref)
-       
+     
         # Hide main window until auth succeeds
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
@@ -482,6 +482,7 @@ class PasswordManager(ctk.CTk):
         self.after(100, self.process_message_queue)
     def on_close(self):
         if self.settings.get("minimize_to_tray", False):
+            self.authenticated = False
             self.withdraw()
         else:
             self.exit_app()
@@ -1206,7 +1207,7 @@ class PasswordManager(ctk.CTk):
     def _apply_theme(self, theme_mode):
         """Apply theme based on mode: 'light', 'dark', or 'system'"""
         global current_theme, BG, CARD, CARD_HOVER, ACCENT, ACCENT_DIM, TEXT, BLACK_HOLE_WIDE_LOGO
-       
+     
         if theme_mode == "system":
             # Use CTK default appearance (respects system settings)
             ctk.set_appearance_mode("system")
@@ -1214,10 +1215,10 @@ class PasswordManager(ctk.CTk):
             ctk.set_appearance_mode("light")
         else: # "dark" or any other value defaults to dark
             ctk.set_appearance_mode("dark")
-       
+     
         # Detect the actual appearance mode
         current_theme = "dark" if ctk.get_appearance_mode() == "Dark" else "light"
-       
+     
         # Update global color variables
         theme_colors = THEMES[current_theme]
         BG = theme_colors["BG"]
@@ -1227,7 +1228,7 @@ class PasswordManager(ctk.CTk):
         ACCENT_DIM = theme_colors["ACCENT_DIM"]
         TEXT = theme_colors["TEXT"]
         BLACK_HOLE_WIDE_LOGO = theme_colors["BLACK_HOLE_WIDE_LOGO"]
-       
+     
         try:
             ctk.set_default_color_theme("dark-blue")
         except Exception:
@@ -1259,17 +1260,17 @@ class PasswordManager(ctk.CTk):
         self.search_entry.pack(side="left", fill="x", expand=True)
         self.search_entry.bind("<Return>", lambda e: self.load_cards())
         self.search_entry.bind("<KeyRelease>", lambda e: self._update_search_buttons())
-       
+     
         # Search button
         self.search_btn = ctk.CTkButton(search_subframe, text="🔎", command=self.load_cards,
                                          fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=32, font=("Nunito", 12))
         self.search_btn.pack(side="left", padx=(5, 2))
-       
+     
         # Clear button
         self.clear_search_btn = ctk.CTkButton(search_subframe, text="❌", command=self._clear_search,
                                                fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=32, font=("Nunito", 12))
         self.clear_search_btn.pack(side="left", padx=(2, 0))
-       
+     
         self._update_search_buttons()
         # Sort options
         sort_frame = ctk.CTkFrame(header, fg_color=BG)
@@ -1521,7 +1522,7 @@ class PasswordManager(ctk.CTk):
         self._rebuild_cards()
         # Scroll to top
         self.cards_frame._parent_canvas.yview_moveto(0)
-   
+ 
     def _rebuild_cards(self):
         """Internal method that rebuilds the cards grid"""
         search_term = self.search_var.get().strip().lower()
@@ -1560,12 +1561,12 @@ class PasswordManager(ctk.CTk):
             case _:
                 num_columns = 1
         self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
-       
+     
         # Show appropriate message if empty
         if not rows:
             no_results_frame = ctk.CTkFrame(self.cards_frame, fg_color=BG)
             no_results_frame.grid(row=0, column=0, columnspan=num_columns, sticky="nsew", padx=20, pady=40)
-           
+         
             if not all_rows:
                 # Database is completely empty
                 ctk.CTkLabel(no_results_frame, text="No passwords yet", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
@@ -1575,7 +1576,7 @@ class PasswordManager(ctk.CTk):
                 ctk.CTkLabel(no_results_frame, text="No results found", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
                 ctk.CTkLabel(no_results_frame, text="Try adjusting your search", font=("Nunito", 12), text_color=ACCENT_DIM).pack()
             return
-       
+     
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes = row
             try:
@@ -1627,23 +1628,20 @@ class PasswordManager(ctk.CTk):
             user_frame.pack_propagate(0)
             user_label.pack(side="left", padx=4)
             user_label.bind("<Button-1>", lambda e, u=user: copy_text(u, "Username copied!"))
-
             # Password with outline and copy symbol
             pwd_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
             pwd_frame.pack(fill="x", pady=2)
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
             # Note: pwd_label now holds the reference to the CTkLabel object
-            pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w", 
+            pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w",
                                     text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
             pwd_frame.pack_propagate(0)
             pwd_label.pack(side="left", padx=4)
             pwd_label.bind("<Button-1>", lambda e, p=pwd: copy_text(p, "Password copied!"))
-
             right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0, height=150)
             right.pack(side="right", padx=4, pady=4)
             righter = ctk.CTkFrame(right, fg_color=CARD, corner_radius=0)
             righter.pack(side="right", padx=4, pady=0)
-
             # FIX: Added 'label' parameter to accept the CTkLabel object
             def toggle_show(pw=pwd, var=pwd_var, label=pwd_label):
                 # Determine the new display value
@@ -1651,18 +1649,16 @@ class PasswordManager(ctk.CTk):
                     new_text = pw
                 else:
                     new_text = "*"*len(pw)
-                    
+                  
                 # 1. Update the StringVar value
                 var.set(new_text)
-
                 # 2. CRUCIAL FIX: Update the label's text explicitly
                 label.configure(text=f"🗐 Password: {new_text}")
-                
+              
             # FIX: Use lambda to pass the necessary arguments, including the pwd_label object
-            ctk.CTkButton(right, text="Show", 
+            ctk.CTkButton(right, text="Show",
                         command=lambda p=pwd, v=pwd_var, l=pwd_label: toggle_show(p, v, l),
                         width=50, fg_color=ACCENT, text_color=BG, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
-
             ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=50, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
             def show_notes(n=notes):
                 messagebox.showinfo("Notes", n or "No notes")
@@ -1679,7 +1675,7 @@ class PasswordManager(ctk.CTk):
         else:
             self.search_btn.pack_forget()
             self.clear_search_btn.pack_forget()
-   
+ 
     def _clear_search(self):
         """Clear the search entry and reload cards"""
         self.search_var.set("")
@@ -1952,7 +1948,6 @@ class PasswordManager(ctk.CTk):
         safe_modal(popup)
         self.after(50, lambda: fix_scrollable_frame(export_frame))
         self.wait_window(popup)
-
     def export_docx(self):
         if not self._verify_master_password():
             return
@@ -1971,6 +1966,104 @@ class PasswordManager(ctk.CTk):
         path = filedialog.asksaveasfilename(defaultextension=".docx", filetypes=[("Word","*.docx")])
         if path:
             doc.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_odt(self):
+        if not self._verify_master_password():
+            return
+        odt = OpenDocumentText()
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            for text in [f"Title: {title}", f"Username: {user}", f"Password: {pwd}", f"Notes: {notes}", "-"*30]:
+                p = P(text=text)
+                odt.text.addElement(p)
+        path = filedialog.asksaveasfilename(defaultextension=".odt", filetypes=[("OpenDocument","*.odt")])
+        if path:
+            odt.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_txt(self):
+        if not self._verify_master_password():
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text","*.txt")])
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
+                for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+                    title, user, pwd_enc, notes = row
+                    try:
+                        pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+                    except Exception:
+                        pwd = ""
+                    f.write(f"Title: {title}\n")
+                    f.write(f"Username: {user}\n")
+                    f.write(f"Password: {pwd}\n")
+                    f.write(f"Notes: {notes}\n")
+                    f.write("-"*30 + "\n")
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_xlsx(self):
+        if not self._verify_master_password():
+            return
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["Title", "Username", "Password", "Notes"])
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            ws.append([title, user, pwd, notes])
+        path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel","*.xlsx")])
+        if path:
+            wb.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_ods(self):
+        if not self._verify_master_password():
+            return
+        doc = OpenDocumentSpreadsheet()
+        table = Table(name="Passwords")
+        doc.spreadsheet.addElement(table)
+        header_row = TableRow()
+        for header in ["Title", "Username", "Password", "Notes"]:
+            cell = TableCell()
+            p = P(text=header)
+            cell.addElement(p)
+            header_row.addElement(cell)
+        table.addElement(header_row)
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            data_row = TableRow()
+            for value in [title, user, pwd, notes]:
+                cell = TableCell()
+                p = P(text=value)
+                cell.addElement(p)
+                data_row.addElement(cell)
+            table.addElement(data_row)
+        path = filedialog.asksaveasfilename(defaultextension=".ods", filetypes=[("OpenDocument Spreadsheet","*.ods")])
+        if path:
+            doc.save(path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_csv(self):
+        if not self._verify_master_password():
+            return
+        data = []
+        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
+            title, user, pwd_enc, notes = row
+            try:
+                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            except Exception:
+                pwd = ""
+            data.append({"Title": title, "Username": user, "Password": pwd, "Notes": notes})
+        df = pd.DataFrame(data)
+        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
+        if path:
+            df.to_csv(path, index=False)
             messagebox.showinfo("Exported", f"Exported to {path}")
     def export_odt(self):
         if not self._verify_master_password():
