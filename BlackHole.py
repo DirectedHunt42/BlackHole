@@ -1934,8 +1934,6 @@ class PasswordManager(ctk.CTk):
         sheet_btns = add_section(export_frame, "Spreadsheets")
         ctk.CTkButton(sheet_btns, text=".xlsx", command=self.export_xlsx,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
-        ctk.CTkButton(sheet_btns, text=".xlsx", command=self.export_xlsx,
-                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(sheet_btns, text=".ods", command=self.export_ods,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(sheet_btns, text=".csv", command=self.export_csv,
@@ -1946,8 +1944,15 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(slide_btns, text=".pptx", command=self.export_pptx,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
+        def fix_scrollable_frame(sf):
+            sf.update_idletasks()
+            sf._parent_canvas.configure(scrollregion=sf._parent_canvas.bbox("all"))
+            sf._parent_canvas.xview_moveto(0)
+            sf._parent_canvas.yview_moveto(0)
         safe_modal(popup)
+        self.after(50, lambda: fix_scrollable_frame(export_frame))
         self.wait_window(popup)
+
     def export_docx(self):
         if not self._verify_master_password():
             return
