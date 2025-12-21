@@ -20,6 +20,7 @@ from odf.draw import Page, Frame, TextBox, Image
 from odf.style import MasterPage
 from PIL import Image, ImageTk
 import urllib
+import urllib.request  # Added for potential server calls
 import ctypes
 import queue
 import openpyxl
@@ -28,6 +29,9 @@ from pptx import Presentation
 from pptx.util import Inches
 import platform
 import darkdetect
+import secrets  # Added for password generator
+import string   # Added for password generator
+import hashlib  # Added for simple key hashing
 if platform.system() == "Windows":
     from ctypes import *
     from ctypes.wintypes import *
@@ -394,6 +398,8 @@ class PasswordManager(ctk.CTk):
         self.c = None
         self.authenticated = False
         self.ui_built = False
+        # Pro status (for gating features)
+        self.is_pro = False
         # load settings
         self.settings = {"master_password_set": False}
         if os.path.exists(settings_path):
@@ -1317,6 +1323,10 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         sync_key_btn.pack(side="right", padx=4)
         Tooltip(sync_key_btn, "Show Sync Key")
+        if not self.is_pro:
+            pro_btn = ctk.CTkButton(header, text="Upgrade to Pro!", command=lambda: webbrowser.open_new("https://www.patreon.com/NovaFoundry"), fg_color="#dcb54d", text_color="#000000", hover_color="#c9a03d", width=12, font=("Nunito", 12))
+            pro_btn.pack(side="right", padx=4)
+            Tooltip(pro_btn, "Upgrade to Pro!")
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Keyboard bindings for main window
@@ -1436,6 +1446,14 @@ class PasswordManager(ctk.CTk):
         theme_combo = ctk.CTkComboBox(frame, values=theme_options, variable=theme_var, width=200, font=("Nunito", 11))
         theme_combo.pack(padx=10, pady=(0,10))
         theme_combo.configure(command=lambda val: self.toggle_theme(val))
+        # Pro upgrade section
+        pro_frame = ctk.CTkFrame(frame, fg_color=CARD, corner_radius=8)
+        pro_frame.pack(pady=10, padx=10, fill="x")
+        ctk.CTkLabel(pro_frame, text="Pro", font=("Nunito", 14, "bold"), text_color=TEXT).pack(pady=5)
+        if not self.is_pro:
+            ctk.CTkLabel(pro_frame, text="Pro Inactive ✕", text_color=ACCENT_DIM).pack(pady=5)
+        else:
+            ctk.CTkLabel(pro_frame, text="Pro Activated ✓", text_color=ACCENT).pack(pady=5)
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Check for Updates", command=lambda: self.check_for_update(False), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
@@ -1712,7 +1730,7 @@ class PasswordManager(ctk.CTk):
         popup.bind("<Return>", lambda e: create_card_action())
         safe_modal(popup)
         self.wait_window(popup)
-    # --- Edit Card Popup ---
+    # --- Edit Card Popup (Updated with new features) ---
     def edit_card_popup(self, id_):
         row = self.c.execute("SELECT title, username, password, notes FROM passwords WHERE id=?", (id_,)).fetchone()
         if not row:
@@ -1739,6 +1757,26 @@ class PasswordManager(ctk.CTk):
         pwd_var = StringVar(value=pwd)
         pwd_entry = ctk.CTkEntry(popup, textvariable=pwd_var, show="*", width=420)
         pwd_entry.pack(padx=20, pady=(4,8))
+        # Password strength evaluator
+        strength_label = ctk.CTkLabel(popup, text="Strength: Weak", text_color="#ff0000")
+        strength_label.pack(pady=(0,4))
+        def update_strength(*args):
+            strength = self.evaluate_password_strength(pwd_var.get())
+            colors = {"Weak": "#ff0000", "Medium": "#ffa500", "Strong": "#00ff00"}
+            strength_label.configure(text=f"Strength: {strength}", text_color=colors[strength])
+        pwd_var.trace("w", update_strength)
+        update_strength()  # Initial
+        # Password generator button
+        def generate_password():
+            if not self.is_pro:
+                messagebox.showinfo("Pro Feature", "Password generator is a Pro feature.")
+                return
+            length = 16  # Default; can add options popup
+            chars = string.ascii_letters + string.digits + string.punctuation
+            new_pwd = ''.join(secrets.choice(chars) for _ in range(length))
+            pwd_var.set(new_pwd)
+            pwd_entry.configure(show="*")  # Reset show
+        ctk.CTkButton(popup, text="Generate Password", command=generate_password, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         def toggle_pwd_entry():
             pwd_entry.configure(show="" if pwd_entry.cget("show")=="*" else "*")
         ctk.CTkButton(popup, text="Show/Hide", command=toggle_pwd_entry, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
@@ -1748,12 +1786,22 @@ class PasswordManager(ctk.CTk):
         ctk.CTkLabel(popup, text="Icon", text_color=ACCENT_DIM, fg_color=BG).pack(anchor="w", padx=20)
         new_icon_path = None
         def upload_icon():
-            nonlocal new_icon_path
             file = filedialog.askopenfilename(filetypes=[("Images", "*.png *.jpg *.jpeg *.ico")])
             if file:
                 try:
                     pil_img = Image.open(file)
+                    # Auto-resize to 350x350
                     pil_img = pil_img.resize((350, 350), Image.LANCZOS)
+                    # Basic crop option (user inputs coords for simplicity; full UI crop needs canvas)
+                    if self.is_pro:
+                        crop_coords = messagebox.askstring("Crop (optional)", "Enter crop box (left,upper,right,lower) or leave blank:")
+                        if crop_coords:
+                            try:
+                                left, upper, right, lower = map(int, crop_coords.split(','))
+                                pil_img = pil_img.crop((left, upper, right, lower))
+                                pil_img = pil_img.resize((350, 350), Image.LANCZOS)  # Re-resize after crop
+                            except:
+                                messagebox.showerror("Error", "Invalid crop coords.")
                     orig_ext = os.path.splitext(file)[1].lower()
                     if orig_ext == '.ico':
                         orig_ext = '.png'
@@ -1767,10 +1815,19 @@ class PasswordManager(ctk.CTk):
                             if os.path.exists(old_path):
                                 os.remove(old_path)
                     new_icon_path = dest
-                    messagebox.showinfo("Uploaded", "Icon uploaded and resized!", parent=popup)
+                    messagebox.showinfo("Uploaded", "Icon uploaded, resized, and saved!", parent=popup)
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to process icon: {e}", parent=popup)
-        ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
+        ctk.CTkButton(popup, text="Upload & Resize/Crop Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
+        # Auto-query Google Images
+        def auto_find_icon():
+            if not self.is_pro:
+                messagebox.showinfo("Pro Feature", "Auto icon search is a Pro feature.")
+                return
+            search_query = f"{title_var.get()} logo high quality png svg"
+            webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch")
+            messagebox.showinfo("Search Opened", "Browser opened to Google Images. Download a high-quality image and upload it here.")
+        ctk.CTkButton(popup, text="Find Icon on Google", command=auto_find_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         pinned_var = ctk.CTkSwitch(popup, text="Pinned to Tray")
         pinned_var.pack(pady=8)
         if id_ in self.pinned:
@@ -1805,6 +1862,17 @@ class PasswordManager(ctk.CTk):
         popup.bind("<Return>", lambda e: save_card())
         safe_modal(popup)
         self.wait_window(popup)
+    # --- New: Simple Password Strength Evaluator ---
+    def evaluate_password_strength(self, pwd):
+        score = 0
+        if len(pwd) >= 12: score += 2
+        if any(c.isupper() for c in pwd): score += 1
+        if any(c.islower() for c in pwd): score += 1
+        if any(c.isdigit() for c in pwd): score += 1
+        if any(c in string.punctuation for c in pwd): score += 1
+        if score < 3: return "Weak"
+        elif score < 5: return "Medium"
+        return "Strong"
     # --- Delete ---
     def delete_card(self, id_):
         if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this entry?"):
