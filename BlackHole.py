@@ -228,7 +228,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.8.0"
+VERSION = "1.8.1"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -398,8 +398,6 @@ class PasswordManager(ctk.CTk):
         self.c = None
         self.authenticated = False
         self.ui_built = False
-        # Pro status (for gating features)
-        self.is_pro = False
         # load settings
         self.settings = {"master_password_set": False}
         if os.path.exists(settings_path):
@@ -1323,10 +1321,10 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         sync_key_btn.pack(side="right", padx=4)
         Tooltip(sync_key_btn, "Show Sync Key")
-        if not self.is_pro:
-            pro_btn = ctk.CTkButton(header, text="Upgrade to Pro!", command=lambda: webbrowser.open_new("https://www.patreon.com/NovaFoundry"), fg_color="#dcb54d", text_color="#000000", hover_color="#c9a03d", width=12, font=("Nunito", 12))
-            pro_btn.pack(side="right", padx=4)
-            Tooltip(pro_btn, "Upgrade to Pro!")
+        support_btn = ctk.CTkButton(header, text="💖", command=lambda: webbrowser.open_new("https://novafoundry.ca/support"),
+                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
+        support_btn.pack(side="right", padx=4)
+        Tooltip(support_btn, "Support Nova Foundry")
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Keyboard bindings for main window
@@ -1449,11 +1447,6 @@ class PasswordManager(ctk.CTk):
         # Pro upgrade section
         pro_frame = ctk.CTkFrame(frame, fg_color=CARD, corner_radius=8)
         pro_frame.pack(pady=10, padx=10, fill="x")
-        ctk.CTkLabel(pro_frame, text="Pro", font=("Nunito", 14, "bold"), text_color=TEXT).pack(pady=5)
-        if not self.is_pro:
-            ctk.CTkLabel(pro_frame, text="Pro Inactive ✕", text_color=ACCENT_DIM).pack(pady=5)
-        else:
-            ctk.CTkLabel(pro_frame, text="Pro Activated ✓", text_color=ACCENT).pack(pady=5)
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Check for Updates", command=lambda: self.check_for_update(False), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
@@ -1768,9 +1761,6 @@ class PasswordManager(ctk.CTk):
         update_strength()  # Initial
         # Password generator button
         def generate_password():
-            if not self.is_pro:
-                messagebox.showinfo("Pro Feature", "Password generator is a Pro feature.")
-                return
             length = 16  # Default; can add options popup
             chars = string.ascii_letters + string.digits + string.punctuation
             new_pwd = ''.join(secrets.choice(chars) for _ in range(length))
@@ -1792,16 +1782,6 @@ class PasswordManager(ctk.CTk):
                     pil_img = Image.open(file)
                     # Auto-resize to 350x350
                     pil_img = pil_img.resize((350, 350), Image.LANCZOS)
-                    # Basic crop option (user inputs coords for simplicity; full UI crop needs canvas)
-                    if self.is_pro:
-                        crop_coords = messagebox.askstring("Crop (optional)", "Enter crop box (left,upper,right,lower) or leave blank:")
-                        if crop_coords:
-                            try:
-                                left, upper, right, lower = map(int, crop_coords.split(','))
-                                pil_img = pil_img.crop((left, upper, right, lower))
-                                pil_img = pil_img.resize((350, 350), Image.LANCZOS)  # Re-resize after crop
-                            except:
-                                messagebox.showerror("Error", "Invalid crop coords.")
                     orig_ext = os.path.splitext(file)[1].lower()
                     if orig_ext == '.ico':
                         orig_ext = '.png'
@@ -1818,15 +1798,11 @@ class PasswordManager(ctk.CTk):
                     messagebox.showinfo("Uploaded", "Icon uploaded, resized, and saved!", parent=popup)
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to process icon: {e}", parent=popup)
-        ctk.CTkButton(popup, text="Upload & Resize/Crop Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
+        ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         # Auto-query Google Images
         def auto_find_icon():
-            if not self.is_pro:
-                messagebox.showinfo("Pro Feature", "Auto icon search is a Pro feature.")
-                return
             search_query = f"{title_var.get()} logo high quality png svg"
             webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch")
-            messagebox.showinfo("Search Opened", "Browser opened to Google Images. Download a high-quality image and upload it here.")
         ctk.CTkButton(popup, text="Find Icon on Google", command=auto_find_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         pinned_var = ctk.CTkSwitch(popup, text="Pinned to Tray")
         pinned_var.pack(pady=8)
@@ -2363,7 +2339,7 @@ class PasswordManager(ctk.CTk):
         def open_official_link(event):
             webbrowser.open_new("https://novafoundry.ca")
         def open_support_link(event):
-            webbrowser.open_new("https://buymeacoffee.com/novafoundry")
+            webbrowser.open_new("https://novafoundry.ca/support")
         support_link.bind("<Button-1>", open_support_link)
         official_link.bind("<Button-1>", open_official_link)
         ctk.CTkButton(popup, text="OK", command=lambda: (popup.grab_release(), popup.destroy()),
