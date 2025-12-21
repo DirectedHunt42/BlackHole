@@ -1,10 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Define paths for compilers (adjust if necessary)
-set "iscc_path=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-set "builder_path=C:\Program Files\InstallBuilder Enterprise 25.10.1\bin\builder-cli.exe"
-
 :: Get repo directory
 set "repo_dir=%CD%"
 
@@ -18,6 +14,28 @@ set "docs=%USERPROFILE%\Documents\InstallBuilder\output"
 set /p version="Enter the release version (e.g., 1.0.0): "
 set "tag=v%version%"
 set "title=BlackHole %version%"
+
+:: Ask for computer
+set /p computer="Enter the target computer name (1 for laptop, 2 for desktop): "
+if "%computer%"=="1" (
+    set "computer_name=Laptop"
+) else if "%computer%"=="2" (
+    set "computer_name=Desktop"
+) else (
+    echo Invalid input. Please enter 1 or 2.
+    exit /b 1
+)
+
+if "%computer_name%"=="Laptop" (
+    :: Define paths for compilers (adjust if necessary)
+    set "iscc_path=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+    set "builder_path=C:\Program Files\InstallBuilder Enterprise 25.10.1\bin\builder-cli.exe"
+)
+if "%computer_name%"=="Desktop" (
+    :: Define paths for compilers (adjust if necessary)
+    set "iscc_path=D:\Inno Setup 6\ISCC.exe"
+    set "builder_path=D:\InstallBuilder\bin\builder-cli.exe"
+)
 
 :: Get current date in YYYY-MM-DD
 for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
