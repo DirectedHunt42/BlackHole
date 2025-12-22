@@ -109,11 +109,11 @@ echo.
 
 :: Step 5: Build Linux installer and move to Downloads
 echo Building Linux installer...
-echo Compiling using InstallBuilder with file: %repo_dir%\Extras\BlackHole.xml for linux-x64
+echo Compiling using InstallBuilder with file: %repo_dir%\Extras\BlackHole.xml for linux
 set "xml_path=%repo_dir%\Extras\BlackHole.xml"
-"%builder_path%" build "%xml_path%" linux-x64
-set "linux_installer=%docs%\BlackHole-%version%-linux-x64-installer.run"
-set "linux_installer_final=%downloads%\BlackHole-%version%-linux-x64-installer.run"
+"%builder_path%" build "%xml_path%" linux
+set "linux_installer=%docs%\BlackHole-%version%-linux-installer.run"
+set "linux_installer_final=%downloads%\BlackHole-%version%-linux-installer.run"
 move "%linux_installer%" "%linux_installer_final%" > nul
 call :progress 60
 echo.
@@ -130,7 +130,7 @@ del /q "%downloads%\Black Hole Installer.png"
 call :progress 100
 echo.
 
-echo Setup complete. Check Downloads folder for: Black hole.png, Windows-BlackHole.zip, Linux-BlackHole.zip, Black_hole_setup.exe, BlackHole-%version%-linux-x64-installer.run
+echo Setup complete. Check Downloads folder for: Black hole.png, Windows-BlackHole.zip, Linux-BlackHole.zip, Black_hole_setup.exe, BlackHole-%version%-linux-installer.run
 pause
 
 :: Exit main script before subroutines
