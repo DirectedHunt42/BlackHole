@@ -228,7 +228,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.8.1"
+VERSION = "1.9.0"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1757,10 +1757,12 @@ class PasswordManager(ctk.CTk):
             strength = self.evaluate_password_strength(pwd_var.get())
             colors = {"Weak": "#ff0000", "Medium": "#ffa500", "Strong": "#00ff00"}
             strength_label.configure(text=f"Strength: {strength}", text_color=colors[strength])
-        pwd_var.trace("w", update_strength)
+        pwd_var.trace_add("write", update_strength)
         update_strength()  # Initial
         # Password generator button
         def generate_password():
+            if not messagebox.askyesno("Generate Password", "This will overwrite the current password. Continue?", parent=popup):
+                return
             length = 16  # Default; can add options popup
             chars = string.ascii_letters + string.digits + string.punctuation
             new_pwd = ''.join(secrets.choice(chars) for _ in range(length))
@@ -1777,27 +1779,137 @@ class PasswordManager(ctk.CTk):
         new_icon_path = None
         def upload_icon():
             file = filedialog.askopenfilename(filetypes=[("Images", "*.png *.jpg *.jpeg *.ico")])
-            if file:
-                try:
-                    pil_img = Image.open(file)
-                    # Auto-resize to 350x350
-                    pil_img = pil_img.resize((350, 350), Image.LANCZOS)
-                    orig_ext = os.path.splitext(file)[1].lower()
-                    if orig_ext == '.ico':
-                        orig_ext = '.png'
-                    dest = os.path.join(stored_icons_path, f"{id_}{orig_ext}")
-                    format_to_save = 'JPEG' if orig_ext == '.jpg' or orig_ext == '.jpeg' else 'PNG'
-                    pil_img.save(dest, format=format_to_save)
-                    # Remove old icons with different extensions
-                    for other_ext in ['.png', '.jpg', '.jpeg']:
-                        if other_ext != orig_ext:
-                            old_path = os.path.join(stored_icons_path, f"{id_}{other_ext}")
-                            if os.path.exists(old_path):
-                                os.remove(old_path)
-                    new_icon_path = dest
-                    messagebox.showinfo("Uploaded", "Icon uploaded, resized, and saved!", parent=popup)
-                except Exception as e:
-                    messagebox.showerror("Error", f"Failed to process icon: {e}", parent=popup)
+            if not file:
+                return
+            original_img = Image.open(file)
+            editor_popup = ctk.CTkToplevel(popup)  # 'popup' is the edit_card_popup window
+            editor_popup.title("Crop and Zoom Image")
+            editor_popup.configure(fg_color=BG)
+            editor_popup.resizable(False, False)
+            PasswordManager.set_window_icon(editor_popup)
+            
+            canvas_size = 350
+            center = canvas_size / 2
+            zoom_level = 1.0
+            image_x = center
+            image_y = center
+            photo = None  # To keep reference
+            start_pan_x = 0
+            start_pan_y = 0
+            start_image_x = 0
+            start_image_y = 0
+            
+            canvas_frame = ctk.CTkFrame(editor_popup, fg_color=CARD)
+            canvas_frame.pack(pady=10, padx=10)
+            canvas = ctk.CTkCanvas(canvas_frame, width=canvas_size, height=canvas_size, bg="gray")
+            canvas.pack()
+            
+            def display_image():
+                nonlocal photo
+                w, h = original_img.size
+                new_w = int(w * zoom_level)
+                new_h = int(h * zoom_level)
+                resized = original_img.resize((new_w, new_h), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(resized)
+                canvas.delete("all")
+                canvas.create_image(image_x, image_y, image=photo, anchor="center")
+            
+            display_image()
+            
+            def zoom_at(mx, my, scale):
+                nonlocal zoom_level, image_x, image_y
+                old_zoom = zoom_level
+                zoom_level *= scale
+                zoom_level = max(0.1, zoom_level)
+                image_x = mx - (mx - image_x) * (zoom_level / old_zoom)
+                image_y = my - (my - image_y) * (zoom_level / old_zoom)
+                display_image()
+            
+            def zoom_in_center():
+                zoom_at(center, center, 1.2)
+            
+            def zoom_out_center():
+                zoom_at(center, center, 1 / 1.2)
+            
+            def on_mouse_wheel(event):
+                mx = canvas.winfo_pointerx() - canvas.winfo_rootx()
+                my = canvas.winfo_pointery() - canvas.winfo_rooty()
+                scale = 1.1 if event.delta > 0 else 1 / 1.1
+                zoom_at(mx, my, scale)
+            
+            def start_pan(event):
+                nonlocal start_pan_x, start_pan_y, start_image_x, start_image_y
+                start_pan_x = event.x
+                start_pan_y = event.y
+                start_image_x = image_x
+                start_image_y = image_y
+            
+            def pan(event):
+                nonlocal image_x, image_y
+                dx = event.x - start_pan_x
+                dy = event.y - start_pan_y
+                image_x = start_image_x + dx
+                image_y = start_image_y + dy
+                display_image()
+            
+            def reset_zoom():
+                nonlocal zoom_level, image_x, image_y
+                zoom_level = 1.0
+                image_x = center
+                image_y = center
+                display_image()
+            
+            canvas.bind("<MouseWheel>", on_mouse_wheel)
+            canvas.bind("<Button-4>", lambda e: zoom_at(e.x, e.y, 1.1))
+            canvas.bind("<Button-5>", lambda e: zoom_at(e.x, e.y, 1 / 1.1))
+            canvas.bind("<Button-1>", start_pan)
+            canvas.bind("<B1-Motion>", pan)
+            
+            btn_frame = ctk.CTkFrame(editor_popup, fg_color=BG)
+            btn_frame.pack(pady=10)
+            ctk.CTkButton(btn_frame, text="+", command=zoom_in_center, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=40).pack(side="left", padx=5)
+            ctk.CTkButton(btn_frame, text="-", command=zoom_out_center, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=40).pack(side="left", padx=5)
+            ctk.CTkButton(btn_frame, text="Reset", command=reset_zoom, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80).pack(side="left", padx=5)
+            
+            def apply_crop():
+                w, h = original_img.size
+                orig_left = (w / 2) + (0 - image_x) / zoom_level
+                orig_top = (h / 2) + (0 - image_y) / zoom_level
+                orig_right = (w / 2) + (canvas_size - image_x) / zoom_level
+                orig_bottom = (h / 2) + (canvas_size - image_y) / zoom_level
+                crop_box = (max(0, orig_left), max(0, orig_top), min(w, orig_right), min(h, orig_bottom))
+                if crop_box[0] >= crop_box[2] or crop_box[1] >= crop_box[3]:
+                    messagebox.showerror("Error", "No visible image area!", parent=editor_popup)
+                    return
+                cropped = original_img.crop(crop_box)
+                crop_w = crop_box[2] - crop_box[0]
+                crop_h = crop_box[3] - crop_box[1]
+                visible_w = crop_w * zoom_level
+                visible_h = crop_h * zoom_level
+                resized_cropped = cropped.resize((int(visible_w), int(visible_h)), Image.LANCZOS)
+                pos_left_in_canvas = image_x + (crop_box[0] - w / 2) * zoom_level
+                pos_top_in_canvas = image_y + (crop_box[1] - h / 2) * zoom_level
+                final_img = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+                final_img.paste(resized_cropped, (int(pos_left_in_canvas), int(pos_top_in_canvas)))
+                final_img = final_img.resize((350, 350), Image.LANCZOS)  # Ensure final size
+                orig_ext = os.path.splitext(file)[1].lower()
+                if orig_ext == '.ico':
+                    orig_ext = '.png'
+                dest = os.path.join(stored_icons_path, f"{id_}{orig_ext}")
+                format_to_save = 'JPEG' if orig_ext in ('.jpg', '.jpeg') else 'PNG'
+                final_img.save(dest, format=format_to_save)
+                # Remove old icons with different extensions
+                for other_ext in ['.png', '.jpg', '.jpeg']:
+                    if other_ext != orig_ext:
+                        old_path = os.path.join(stored_icons_path, f"{id_}{other_ext}")
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                messagebox.showinfo("Success", "Image cropped, resized, and saved!", parent=editor_popup)
+                editor_popup.destroy()
+            
+            ctk.CTkButton(editor_popup, text="Apply & Save", command=apply_crop, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(pady=10)
+            safe_modal(editor_popup)
+            popup.wait_window(editor_popup)  # 'popup' is the edit_card_popup
         ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         # Auto-query Google Images
         def auto_find_icon():
