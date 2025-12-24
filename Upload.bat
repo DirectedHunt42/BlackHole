@@ -16,7 +16,7 @@ set "tag=v%version%"
 set "title=BlackHole %version%"
 
 :: Ask for computer
-set /p computer="Enter the target computer name (1 for laptop, 2 for desktop): "
+set /p computer="Enter the computer (1 for laptop, 2 for desktop): "
 if "%computer%"=="1" (
     set "computer_name=Laptop"
 ) else if "%computer%"=="2" (
@@ -140,7 +140,7 @@ goto :eof
 :progress
 if "%1"=="" (set /a percent=0) else (set /a percent=%1)
 set "bar="
-set /a "width=50"  :: Adjustable width for the bar (shorter for cleaner output)
+set /a "width=100"  :: Adjustable width for the bar (shorter for cleaner output)
 for /l %%i in (1,1,%percent%) do set "bar=!bar!#"
 set /a "next=percent + 1"
 for /l %%i in (%next%,1,%width%) do set "bar=!bar! "
