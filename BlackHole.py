@@ -1414,9 +1414,6 @@ class PasswordManager(ctk.CTk):
         self.wait_window(popup)
     # --- Settings Popup ---
     def show_settings_popup(self):
-        if platform.system() != "Windows":
-            messagebox.showinfo("Info", "Settings are only available on Windows.")
-            return
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
         popup.title("Settings")
@@ -1428,9 +1425,15 @@ class PasswordManager(ctk.CTk):
         frame.pack(padx=20, pady=8, fill="both", expand=False)
         launch_var = ctk.CTkSwitch(frame, text="Launch with Windows")
         launch_var.pack(pady=10, padx=10)
+        if platform.system() != "Windows":
+            launch_var.configure(state="disabled")
+            Tooltip(launch_var, "Launch with Windows is only available on Windows OS")
         if self.settings.get("launch_with_windows", False):
             launch_var.select()
         launch_var.configure(command=lambda: self.toggle_launch(launch_var.get()))
+        if platform.system() != "Windows":
+            tray_var.configure(state="disabled")
+            Tooltip(launch_var, "Launch with Windows is only available on Windows OS")
         tray_var = ctk.CTkSwitch(frame, text="Minimize to Tray")
         tray_var.pack(pady=10, padx=10)
         if self.settings.get("minimize_to_tray", False):
@@ -1444,9 +1447,6 @@ class PasswordManager(ctk.CTk):
         theme_combo = ctk.CTkComboBox(frame, values=theme_options, variable=theme_var, width=200, font=("Nunito", 11))
         theme_combo.pack(padx=10, pady=(0,10))
         theme_combo.configure(command=lambda val: self.toggle_theme(val))
-        # Pro upgrade section
-        pro_frame = ctk.CTkFrame(frame, fg_color=CARD, corner_radius=8)
-        pro_frame.pack(pady=10, padx=10, fill="x")
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Check for Updates", command=lambda: self.check_for_update(False), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
