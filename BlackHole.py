@@ -228,7 +228,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.9.1"
+VERSION = "1.9.2"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1635,7 +1635,7 @@ class PasswordManager(ctk.CTk):
             user_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
             user_frame.pack(fill="x", pady=2)
             user_label = ctk.CTkLabel(user_frame, text=f"🗐 User: {user or ''}", anchor="w",
-                                    text_color=ACCENT_DIM, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
+                                    text_color=ACCENT_DIM, font=("Nunito", 12), width=50, wraplength=200, height=10, cursor="hand2") # Increased font size
             user_frame.pack_propagate(0)
             user_label.pack(side="left", padx=4)
             user_label.bind("<Button-1>", lambda e, u=user: copy_text(u, "Username copied!"))
@@ -1645,7 +1645,7 @@ class PasswordManager(ctk.CTk):
             pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
             # Note: pwd_label now holds the reference to the CTkLabel object
             pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w",
-                                    text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10) # Increased font size
+                                    text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10, cursor="hand2") # Increased font size
             pwd_frame.pack_propagate(0)
             pwd_label.pack(side="left", padx=4)
             pwd_label.bind("<Button-1>", lambda e, p=pwd: copy_text(p, "Password copied!"))
