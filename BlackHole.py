@@ -18,7 +18,7 @@ from odf.text import P
 from odf.table import Table, TableRow, TableCell
 from odf.draw import Page, Frame, TextBox, Image
 from odf.style import MasterPage
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 import urllib
 import urllib.request  # Added for potential server calls
 import ctypes
@@ -228,7 +228,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.9.2"
+VERSION = "1.10.0"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -334,7 +334,8 @@ def safe_modal(popup):
     center_popup(popup)
     popup.update_idletasks()
     popup.update()
-    popup.grab_set()
+    if platform.system() != "Linux":
+        popup.grab_set()
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
     def set_window_icon(window):
@@ -1262,8 +1263,8 @@ class PasswordManager(ctk.CTk):
         self.search_var = StringVar()
         self.search_entry = ctk.CTkEntry(search_subframe, textvariable=self.search_var, placeholder_text="by title")
         self.search_entry.pack(side="left", fill="x", expand=True)
-        self.search_entry.bind("<Return>", lambda e: self.load_cards())
-        self.search_entry.bind("<KeyRelease>", lambda e: self._update_search_buttons())
+        self.search_timer = None
+        self.search_entry.bind("<KeyRelease>", lambda e: self.debounced_search())
      
         # Search button
         self.search_btn = ctk.CTkButton(search_subframe, text="🔎", command=self.load_cards,
@@ -1327,12 +1328,54 @@ class PasswordManager(ctk.CTk):
         Tooltip(support_btn, "Support Nova Foundry")
         self.cards_frame = ctk.CTkScrollableFrame(self, fg_color=BG, corner_radius=10)
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
+        # Back to top button
+        self.back_to_top_btn = ctk.CTkButton(self, text="Back to Top", command=self.scroll_to_top, width=140, height=50, fg_color=ACCENT, text_color=BG, font=("Nunito", 14, "bold"), corner_radius=0, border_width=2, border_color=BG)
+        self.back_to_top_btn.place(relx=0.5, rely=1.0, anchor="center")  # start below screen
+        self.back_to_top_btn.place_forget()  # hide initially
+        self.after(100, self.check_back_to_top)  # start checking scroll position
         # Keyboard bindings for main window
         self.bind("<Control-f>", lambda e: self.search_entry.focus())
         self.bind("<Control-s>", lambda e: self.export_popup())
-        self.bind("<Up>", lambda e: self.cards_frame._parent_canvas.yview_scroll(-20, "units"))
-        self.bind("<Down>", lambda e: self.cards_frame._parent_canvas.yview_scroll(20, "units"))
-        self.check_for_update(True)
+        self.bind("<Up>", lambda e: (self.cards_frame._parent_canvas.yview_scroll(-20, "units"), self.check_back_to_top()))
+        self.bind("<Down>", lambda e: (self.cards_frame._parent_canvas.yview_scroll(20, "units"), self.check_back_to_top()))
+        if self.settings.get("check_updates_on_startup", True):
+            self.check_for_update(True)
+    def scroll_to_top(self):
+        current = self.cards_frame._parent_canvas.yview()[0]
+        def step():
+            nonlocal current
+            current -= 0.02
+            if current > 0:
+                self.cards_frame._parent_canvas.yview_moveto(current)
+                self.after(30, step)
+            else:
+                self.cards_frame._parent_canvas.yview_moveto(0)
+                self.check_back_to_top()
+        if current > 0:
+            step()
+        else:
+            self.check_back_to_top()
+    def check_back_to_top(self):
+        yview = self.cards_frame._parent_canvas.yview()
+        if yview[0] > 0.1:  # scrolled down more than 10%
+            if not self.back_to_top_btn.winfo_ismapped():  # if not visible
+                self.animate_button_in()
+        else:
+            self.back_to_top_btn.place_forget()
+        self.after(100, self.check_back_to_top)
+    def animate_button_in(self):
+        self.back_to_top_btn.place(relx=0.5, rely=1.0, anchor="center")
+        self.back_to_top_btn.lift()  # bring to front
+        current = 1.0
+        def step():
+            nonlocal current
+            current -= 0.03
+            if current > 0.95:
+                self.back_to_top_btn.place(relx=0.5, rely=current, anchor="center")
+                self.after(30, step)
+            else:
+                self.back_to_top_btn.place(relx=0.5, rely=0.95, anchor="center")
+        step()
     def import_spreadsheet(self):
         file_path = filedialog.askopenfilename(title="Select Spreadsheet", filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv")])
         if not file_path:
@@ -1439,7 +1482,11 @@ class PasswordManager(ctk.CTk):
         if self.settings.get("minimize_to_tray", False):
             tray_var.select()
         tray_var.configure(command=lambda: self.toggle_tray(tray_var.get()))
-        # Theme selector
+        update_check_var = ctk.CTkSwitch(frame, text="Check for Updates on Startup")
+        update_check_var.pack(pady=10, padx=10)
+        if self.settings.get("check_updates_on_startup", True):
+            update_check_var.select()
+        update_check_var.configure(command=lambda: self.toggle_update_check(update_check_var.get()))
         ctk.CTkLabel(frame, text="Theme:", text_color=TEXT).pack(anchor="w", padx=10, pady=(10,4))
         theme_pref = self.settings.get("theme", "system")
         theme_var = ctk.StringVar(value=theme_pref)
@@ -1472,12 +1519,14 @@ class PasswordManager(ctk.CTk):
         if self.settings.get("launch_with_windows", False):
             self.toggle_startup(True)
         self._save_settings()
-    def toggle_startup(self, enable):
+    def toggle_update_check(self, value):
+        self.settings["check_updates_on_startup"] = bool(value)
+        self._save_settings()
         if platform.system() != "Windows":
             return
         reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         app_name = "BlackHole"
-        if enable:
+        if value:
             try:
                 cmd = f'"{sys.argv[0]}"'
                 if self.settings.get("minimize_to_tray", False):
@@ -1590,10 +1639,6 @@ class PasswordManager(ctk.CTk):
      
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes = row
-            try:
-                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-            except Exception:
-                pwd = ""
             shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=360, height=470, border_width=0, corner_radius=0)
             row_num = i // num_columns
             col = i % num_columns
@@ -1642,33 +1687,36 @@ class PasswordManager(ctk.CTk):
             # Password with outline and copy symbol
             pwd_frame = ctk.CTkFrame(left, fg_color=CARD, border_width=2, border_color=CARD_HOVER, corner_radius=4, height=30)
             pwd_frame.pack(fill="x", pady=2)
-            pwd_var = StringVar(value="*"*len(pwd) if pwd else "")
+            pwd_var = StringVar(value="********")
             # Note: pwd_label now holds the reference to the CTkLabel object
             pwd_label = ctk.CTkLabel(pwd_frame, text=f"🗐 Password: {pwd_var.get()}", anchor="w",
                                     text_color=TEXT, font=("Nunito", 12), width=50, wraplength=200, height=10, cursor="hand2") # Increased font size
             pwd_frame.pack_propagate(0)
             pwd_label.pack(side="left", padx=4)
-            pwd_label.bind("<Button-1>", lambda e, p=pwd: copy_text(p, "Password copied!"))
+            is_shown = [False]
+            def copy_password(enc):
+                pwd = self.fernet.decrypt(enc.encode()).decode() if enc else ""
+                copy_text(pwd, "Password copied!")
+            pwd_label.bind("<Button-1>", lambda e, enc=pwd_enc: copy_password(enc))
             right = ctk.CTkFrame(bottom_frame, fg_color=CARD, corner_radius=0, height=150)
             right.pack(side="right", padx=4, pady=4)
             righter = ctk.CTkFrame(right, fg_color=CARD, corner_radius=0)
             righter.pack(side="right", padx=4, pady=0)
             # FIX: Added 'label' parameter to accept the CTkLabel object
-            def toggle_show(pw=pwd, var=pwd_var, label=pwd_label):
-                # Determine the new display value
-                if var.get().startswith("*"):
-                    new_text = pw
+            def toggle_show(enc, var, label, shown):
+                if not shown[0]:
+                    pwd = self.fernet.decrypt(enc.encode()).decode() if enc else ""
+                    var.set(pwd)
+                    label.configure(text=f"🗐 Password: {pwd}")
+                    shown[0] = True
                 else:
-                    new_text = "*"*len(pw)
-                  
-                # 1. Update the StringVar value
-                var.set(new_text)
-                # 2. CRUCIAL FIX: Update the label's text explicitly
-                label.configure(text=f"🗐 Password: {new_text}")
+                    var.set("********")
+                    label.configure(text=f"🗐 Password: ********")
+                    shown[0] = False
               
             # FIX: Use lambda to pass the necessary arguments, including the pwd_label object
             ctk.CTkButton(right, text="Show",
-                        command=lambda p=pwd, v=pwd_var, l=pwd_label: toggle_show(p, v, l),
+                        command=lambda enc=pwd_enc, v=pwd_var, l=pwd_label, s=is_shown: toggle_show(enc, v, l, s),
                         width=50, fg_color=ACCENT, text_color=BG, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
             ctk.CTkButton(right, text="Edit", command=lambda id=id_: self.edit_card_popup(id), width=50, font=("Nunito", 10), height=40).pack(pady=2) # Increased font size
             def show_notes(n=notes):
@@ -1692,6 +1740,11 @@ class PasswordManager(ctk.CTk):
         self.search_var.set("")
         self._update_search_buttons()
         self.load_cards()
+    def debounced_search(self):
+        if self.search_timer:
+            self.after_cancel(self.search_timer)
+        self.search_timer = self.after(300, self.load_cards)
+        self._update_search_buttons()
     # --- Create Card ---
     def create_new_card(self):
         popup = ctk.CTkToplevel(self)
