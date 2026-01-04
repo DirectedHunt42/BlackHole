@@ -41,6 +41,7 @@ if platform.system() == "Windows":
     kernel32 = windll.kernel32
     WM_USER = 0x0400
     WM_COMMAND = 0x0111
+    WM_CLOSE = 0x0010
     WM_LBUTTONDBLCLK = 0x0203
     WM_RBUTTONDOWN = 0x0204
     NIM_ADD = 0
@@ -133,7 +134,7 @@ if platform.system() == "Windows":
 # Single instance enforcement using mutex
 if platform.system() == "Windows":
     ERROR_ALREADY_EXISTS = 183
-    mutex_name = "Global\\BlackHole_SingleInstance_Mutex"
+    mutex_name = "BlackHole_SingleInstance_Mutex"
     mutex = kernel32.CreateMutexW(None, True, mutex_name)
     err = kernel32.GetLastError()
     if err == ERROR_ALREADY_EXISTS:
@@ -209,7 +210,7 @@ if platform.system() == "Windows":
                 hwnd = None
         if hwnd:
             try:
-                user32.PostMessageW(hwnd, WM_USER + 1, 0, WM_LBUTTONDBLCLK)
+                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
             except Exception:
                 pass
         sys.exit(0)
@@ -228,7 +229,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -237,7 +238,7 @@ if platform.system() == "Windows":
     # Broadcast font change
     HWND_BROADCAST = 0xFFFF
     WM_FONTCHANGE = 0x001D
-    ctypes.windll.user32.SendMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
+    ctypes.windll.user32.PostMessageA(HWND_BROADCAST, WM_FONTCHANGE, 0, 0)
 # --- Paths ---
 if platform.system() == "Windows":
     local_appdata = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
