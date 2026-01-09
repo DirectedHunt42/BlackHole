@@ -32,6 +32,29 @@ import darkdetect
 import secrets  # Added for password generator
 import string   # Added for password generator
 import hashlib  # Added for simple key hashing
+# Lightweight bootstrap logger used during early startup (before full app logger exists)
+def _bootstrap_log(msg: str):
+    try:
+        la = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or os.path.expanduser("~")
+        logdir = os.path.join(la, "NovaFoundry")
+        os.makedirs(logdir, exist_ok=True)
+        logpath = os.path.join(logdir, "BlackHole_debug.log")
+        from datetime import datetime
+        s = f"{datetime.utcnow().isoformat()}Z - {msg}\n"
+        with open(logpath, "a", encoding="utf-8") as lf:
+            lf.write(s)
+            lf.flush()
+        # Also print to stderr/console for immediate visibility
+        try:
+            print(s.strip(), file=sys.stderr, flush=True)
+        except Exception:
+            pass
+    except Exception:
+        try:
+            print(f"BlackHole log: {msg}", file=sys.stderr, flush=True)
+        except Exception:
+            pass
+
 if platform.system() == "Windows":
     from ctypes import *
     from ctypes.wintypes import *
@@ -138,10 +161,13 @@ if platform.system() == "Windows":
     mutex = kernel32.CreateMutexW(None, True, mutex_name)
     err = kernel32.GetLastError()
     if err == ERROR_ALREADY_EXISTS:
+        _bootstrap_log("Detected existing single-instance mutex; attempting to locate running instance(s) and close them.")
         # Try to find the existing window. First try exact match, then enumerate windows by process exe name
         hwnd = None
         try:
             hwnd = user32.FindWindowW(None, "Black Hole Password Manager")
+            if hwnd:
+                _bootstrap_log(f"Found window by title: hwnd={hwnd}")
         except Exception:
             hwnd = None
         if not hwnd:
@@ -190,8 +216,10 @@ if platform.system() == "Windows":
                             if kernel32.QueryFullProcessImageNameW(ph, 0, buf, byref(buf_len)):
                                 exe_path = buf.value
                                 exe_base = os.path.basename(exe_path).lower()
-                                if our_exe and exe_base == our_exe:
+                                # Match either the actual exe name or the common packaged name 'blackhole.exe'
+                                if (our_exe and exe_base == our_exe) or exe_base == 'blackhole.exe' or exe_base.endswith('blackhole.exe'):
                                     found['hwnd'] = h
+                                    _bootstrap_log(f"Matched window by exe name: {exe_base} (pid={p}) hwnd={h}")
                                     kernel32.CloseHandle(ph)
                                     return False
                             try:
@@ -206,14 +234,141 @@ if platform.system() == "Windows":
             try:
                 user32.EnumWindows(EnumWindowsProc(_enum_proc), 0)
                 hwnd = found.get("hwnd")
-            except Exception:
+                if hwnd:
+                    _bootstrap_log(f"Found hwnd via enumeration: {hwnd}")
+            except Exception as e:
+                _bootstrap_log(f"EnumWindows failed: {e}")
                 hwnd = None
-        if hwnd:
+        # Collect candidate PIDs for instances of the same exe
+        candidate_pids = set()
+        try:
+            # If we have an hwnd, get its pid
+            if hwnd:
+                pid_holder = DWORD()
+                try:
+                    user32.GetWindowThreadProcessId(hwnd, byref(pid_holder))
+                    if pid_holder.value and pid_holder.value != os.getpid():
+                        candidate_pids.add(pid_holder.value)
+                        _bootstrap_log(f"Added pid from hwnd: {pid_holder.value}")
+                except Exception as e:
+                    _bootstrap_log(f"Failed to get pid from hwnd: {e}")
+            # Also try to find running processes by name via tasklist as a fallback
             try:
-                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-            except Exception:
-                pass
-        sys.exit(0)
+                import subprocess, csv
+                out = subprocess.check_output(["tasklist", "/FO", "CSV", "/NH"], universal_newlines=True)
+                for line in out.splitlines():
+                    try:
+                        cols = list(csv.reader([line]))[0]
+                        exe_name = cols[0].strip('"').lower()
+                        pid = int(cols[1].strip('"'))
+                        # Match either our detected exe name or 'blackhole.exe' as seen in Task Manager
+                        if pid != os.getpid() and ( (our_exe and exe_name == our_exe) or exe_name == 'blackhole.exe' or exe_name.startswith('blackhole')):
+                            candidate_pids.add(pid)
+                    except Exception:
+                        continue
+                _bootstrap_log(f"Candidate pids from tasklist: {candidate_pids}")
+            except Exception as e:
+                _bootstrap_log(f"tasklist enumeration failed: {e}")
+        except Exception as e:
+            _bootstrap_log(f"candidate pid collection failed: {e}")
+        # For each candidate, attempt graceful WM_CLOSE via EnumWindows and then wait and terminate if needed
+        try:
+            EnumWindowsProc = WINFUNCTYPE(BOOL, HWND, LPARAM)
+            def _post_close(h, lparam):
+                try:
+                    pid_local = DWORD()
+                    user32.GetWindowThreadProcessId(h, byref(pid_local))
+                    if pid_local.value == lparam and user32.IsWindowVisible(h):
+                        try:
+                            user32.PostMessageW(h, WM_CLOSE, 0, 0)
+                            _bootstrap_log(f"Posted WM_CLOSE to hwnd={h} (pid={lparam})")
+                        except Exception as e:
+                            _bootstrap_log(f"Failed to post WM_CLOSE to hwnd={h}: {e}")
+                except Exception as e:
+                    _bootstrap_log(f"_post_close error: {e}")
+                return True
+            for p in list(candidate_pids):
+                try:
+                    _bootstrap_log(f"Attempting graceful close for pid {p}")
+                    # Post WM_CLOSE to windows belonging to that PID
+                    try:
+                        user32.EnumWindows(EnumWindowsProc(_post_close), p)
+                    except Exception as e:
+                        _bootstrap_log(f"EnumWindows during post_close failed for pid {p}: {e}")
+                    # Try waiting for process to exit, otherwise terminate it
+                    PROCESS_TERMINATE = 0x0001
+                    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                    SYNCHRONIZE = 0x00100000
+                    access = PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE
+                    ph = kernel32.OpenProcess(access, False, p)
+                    if ph:
+                        _bootstrap_log(f"Opened process handle for pid {p} with access {access}")
+                        # Wait up to 3s for exit
+                        kernel32.WaitForSingleObject.argtypes = [HANDLE, DWORD]
+                        kernel32.WaitForSingleObject.restype = DWORD
+                        WAIT_OBJECT_0 = 0x00000000
+                        WAIT_TIMEOUT = 0x00000102
+                        WAIT_FAILED = 0xFFFFFFFF
+                        res = kernel32.WaitForSingleObject(ph, 3000)
+                        if res == WAIT_OBJECT_0:
+                            _bootstrap_log(f"PID {p} exited after WM_CLOSE (WAIT_OBJECT_0)")
+                        elif res == WAIT_TIMEOUT:
+                            _bootstrap_log(f"PID {p} did not exit in time; attempting TerminateProcess")
+                            try:
+                                kernel32.TerminateProcess.argtypes = [HANDLE, UINT]
+                                kernel32.TerminateProcess.restype = BOOL
+                                ok = kernel32.TerminateProcess(ph, 1)
+                                _bootstrap_log(f"TerminateProcess called on pid {p}, success={bool(ok)}")
+                                # wait briefly after termination
+                                res2 = kernel32.WaitForSingleObject(ph, 2000)
+                                if res2 == WAIT_OBJECT_0:
+                                    _bootstrap_log(f"PID {p} exited after TerminateProcess")
+                                else:
+                                    _bootstrap_log(f"After TerminateProcess, Wait returned {res2}")
+                            except Exception as e:
+                                _bootstrap_log(f"Failed to terminate pid {p}: {e}")
+                        elif res == WAIT_FAILED:
+                            err = kernel32.GetLastError()
+                            _bootstrap_log(f"WaitForSingleObject failed for pid {p}, GetLastError={err}")
+                            # Try to inspect exit code
+                            try:
+                                kernel32.GetExitCodeProcess.argtypes = [HANDLE, POINTER(DWORD)]
+                                kernel32.GetExitCodeProcess.restype = BOOL
+                                exit_code = DWORD()
+                                if kernel32.GetExitCodeProcess(ph, byref(exit_code)):
+                                    if exit_code.value != 259:  # STILL_ACTIVE
+                                        _bootstrap_log(f"Process pid {p} is not active anymore, exit_code={exit_code.value}")
+                                    else:
+                                        _bootstrap_log(f"Process pid {p} still active (STILL_ACTIVE). Attempting TerminateProcess")
+                                        try:
+                                            kernel32.TerminateProcess.argtypes = [HANDLE, UINT]
+                                            kernel32.TerminateProcess.restype = BOOL
+                                            ok = kernel32.TerminateProcess(ph, 1)
+                                            _bootstrap_log(f"TerminateProcess called on pid {p}, success={bool(ok)}")
+                                        except Exception as e:
+                                            _bootstrap_log(f"TerminateProcess exception for pid {p}: {e}")
+                                else:
+                                    err2 = kernel32.GetLastError()
+                                    _bootstrap_log(f"GetExitCodeProcess failed for pid {p}, GetLastError={err2}")
+                            except Exception as e:
+                                _bootstrap_log(f"GetExitCodeProcess error for pid {p}: {e}")
+                        else:
+                            _bootstrap_log(f"Wait returned unexpected value {res} for pid {p}")
+                        try:
+                            kernel32.CloseHandle(ph)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    _bootstrap_log(f"Error handling pid {p}: {e}")
+        except Exception as e:
+            _bootstrap_log(f"Error enumerating candidate windows/pids: {e}")
+        # Small pause to allow other instances to exit and file locks to clear
+        try:
+            import time
+            time.sleep(0.3)
+        except Exception:
+            pass
+        _bootstrap_log("Instance close/termination attempts complete; proceeding with startup.")
 # Set working directory to the script/exe directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 os.chdir(SCRIPT_DIR)
@@ -229,7 +384,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.10.1"
+VERSION = "1.10.2"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -685,9 +840,9 @@ class PasswordManager(ctk.CTk):
             self._init_db()
             sync_key = urlsafe_b64encode(self.salt).decode()
             self._show_sync_key_display_popup(sync_key)
+            # Persist settings (atomic write handled by helper)
             try:
-                with open(settings_path, "w", encoding="utf-8") as sf:
-                    json.dump(self.settings, sf)
+                self._save_settings()
             except Exception:
                 pass
         return success
@@ -722,9 +877,9 @@ class PasswordManager(ctk.CTk):
         self.settings["salt"] = urlsafe_b64encode(self.salt).decode()
         self.settings["db_path"] = self.db_path
         self.settings["master_password_set"] = True
+        # Persist settings (atomic write handled by helper)
         try:
-            with open(settings_path, "w", encoding="utf-8") as sf:
-                json.dump(self.settings, sf)
+            self._save_settings()
         except Exception:
             pass
         return True
@@ -1204,11 +1359,29 @@ class PasswordManager(ctk.CTk):
             pass
     # --- Save Settings ---
     def _save_settings(self):
+        """Persist settings atomically and ensure data is flushed to disk."""
         try:
-            with open(settings_path, "w", encoding="utf-8") as f:
-                json.dump(self.settings, f)
-        except Exception:
-            pass
+            temp_path = settings_path + ".tmp"
+            # Write to a temp file first to avoid truncation / partial writes
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(self.settings, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            # Replace atomically
+            os.replace(temp_path, settings_path)
+        except Exception as e:
+            # Best-effort fallback and write a diagnostic to stderr for troubleshooting
+            try:
+                with open(settings_path, "w", encoding="utf-8") as f:
+                    json.dump(self.settings, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+            except Exception:
+                pass
+            try:
+                print(f"Failed to save settings: {e}", file=sys.stderr)
+            except Exception:
+                pass
     # --- Apply Theme ---
     def _apply_theme(self, theme_mode):
         """Apply theme based on mode: 'light', 'dark', or 'system'"""
@@ -1475,11 +1648,11 @@ class PasswordManager(ctk.CTk):
         if self.settings.get("launch_with_windows", False):
             launch_var.select()
         launch_var.configure(command=lambda: self.toggle_launch(launch_var.get()))
-        if platform.system() != "Windows":
-            tray_var.configure(state="disabled")
-            Tooltip(launch_var, "Launch with Windows is only available on Windows OS")
         tray_var = ctk.CTkSwitch(frame, text="Minimize to Tray")
         tray_var.pack(pady=10, padx=10)
+        if platform.system() != "Windows":
+            tray_var.configure(state="disabled")
+            Tooltip(tray_var, "Minimize to Tray is only available on Windows OS")
         if self.settings.get("minimize_to_tray", False):
             tray_var.select()
         tray_var.configure(command=lambda: self.toggle_tray(tray_var.get()))
@@ -1553,6 +1726,35 @@ class PasswordManager(ctk.CTk):
         self._apply_theme(theme_mode)
         messagebox.showinfo("Theme Changed", f"Theme changed to {theme_mode.capitalize()}. The app will fully apply the new theme on next launch.")
         os._exit(1)
+    def toggle_startup(self, value):
+        """Enable or disable startup registry entry on Windows."""
+        if platform.system() != "Windows":
+            return
+        reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        app_name = "BlackHole"
+        try:
+            if value:
+                cmd = f'"{sys.argv[0]}"'
+                if self.settings.get("minimize_to_tray", False):
+                    cmd += " --minimize"
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
+                winreg.CloseKey(key)
+                _bootstrap_log(f"Added startup registry entry: {cmd}")
+            else:
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+                    winreg.DeleteValue(key, app_name)
+                    winreg.CloseKey(key)
+                    _bootstrap_log("Removed startup registry entry")
+                except FileNotFoundError:
+                    _bootstrap_log("Startup registry entry not present")
+        except Exception as e:
+            _bootstrap_log(f"toggle_startup registry op failed: {e}")
+            try:
+                messagebox.showerror("Error", f"Failed to update startup setting: {e}")
+            except Exception:
+                pass
     def _change_sort(self, event=None):
         val = self.sort_var.get()
         if val == "Title A-Z":
