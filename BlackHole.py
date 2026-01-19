@@ -1,3 +1,4 @@
+import datetime
 import os
 import shutil
 import sys
@@ -6,6 +7,7 @@ import threading
 import webbrowser
 import customtkinter as ctk
 import sqlite3
+import zipfile
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
@@ -384,7 +386,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.10.2"
+VERSION = "1.10.3"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1669,6 +1671,7 @@ class PasswordManager(ctk.CTk):
         theme_combo.pack(padx=10, pady=(0,10))
         theme_combo.configure(command=lambda val: self.toggle_theme(val))
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
+        ctk.CTkButton(frame, text="Import Icon Bundle", command=self.import_icon_bundle, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Check for Updates", command=lambda: self.check_for_update(False), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
@@ -1755,6 +1758,31 @@ class PasswordManager(ctk.CTk):
                 messagebox.showerror("Error", f"Failed to update startup setting: {e}")
             except Exception:
                 pass
+    def import_icon_bundle(self):
+        import_file = filedialog.askopenfilename(
+            title="Select .hawking File to Import",
+            filetypes=[("Hawking files", "*.hawking")]
+        )
+        if not import_file:
+            return
+
+        proceed = messagebox.askyesno(
+            "Warning",
+            "Importing this archive may overwrite existing icons in the stored icons directory. Do you want to proceed?"
+        )
+        if not proceed:
+            return
+
+        count = 0
+        with zipfile.ZipFile(import_file, "r") as archive:
+            for member in archive.namelist():
+                archive.extract(member, stored_icons_path)
+                count += 1
+
+        messagebox.showinfo(
+            "Imported",
+            f"Imported {count} icons from\n{import_file}"
+        )
     def _change_sort(self, event=None):
         val = self.sort_var.get()
         if val == "Title A-Z":
@@ -2352,6 +2380,9 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(slide_btns, text=".pptx", command=self.export_pptx,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
+        icon_export = add_section(export_frame, "Icons")
+        ctk.CTkButton(icon_export, text="Export Icon Bundle", command=self.export_icons,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=180).pack(pady=5)
         def fix_scrollable_frame(sf):
             sf.update_idletasks()
             sf._parent_canvas.configure(scrollregion=sf._parent_canvas.bbox("all"))
@@ -2647,6 +2678,27 @@ class PasswordManager(ctk.CTk):
         if path:
             prs.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_icons(self):
+        export_dir = filedialog.askdirectory(title="Select Export Directory for Icons")
+        if not export_dir:
+            return
+
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        archive_name = f"{timestamp}.hawking"
+        archive_path = os.path.join(export_dir, archive_name)
+
+        count = 0
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            for file in os.listdir(stored_icons_path):
+                src = os.path.join(stored_icons_path, file)
+                if os.path.isfile(src):
+                    archive.write(src, arcname=file)
+                    count += 1
+
+        messagebox.showinfo(
+            "Exported",
+            f"Exported {count} icons to\n{archive_path}"
+        )
     def show_help(self):
         help_url = "https://github.com/DirectedHunt42/BlackHole/wiki"
         webbrowser.open_new(help_url)
