@@ -1463,7 +1463,7 @@ class PasswordManager(ctk.CTk):
             "custom": "Custom"
         }.get(self.order_mode, "Default")
         self.sort_var = StringVar(value=display_mode)
-        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Nunito", 12), command=self._change_sort)
+        self.sort_combo = ctk.CTkComboBox(sort_frame, values=sort_values, variable=self.sort_var, width=100, font=("Nunito", 12), command=self._change_sort, state="readonly")
         self.sort_combo.pack(side="left", padx=4)
         if self.order_mode == "custom":
             self.edit_order_btn = ctk.CTkButton(sort_frame, text="Edit Order", command=self.edit_custom_order,
@@ -1665,7 +1665,7 @@ class PasswordManager(ctk.CTk):
         theme_pref = self.settings.get("theme", "system")
         theme_var = ctk.StringVar(value=theme_pref)
         theme_options = ["light", "dark", "system"]
-        theme_combo = ctk.CTkComboBox(frame, values=theme_options, variable=theme_var, width=200, font=("Nunito", 11))
+        theme_combo = ctk.CTkComboBox(frame, values=theme_options, variable=theme_var, width=200, font=("Nunito", 11), state="readonly")
         theme_combo.pack(padx=10, pady=(0,10))
         theme_combo.configure(command=lambda val: self.toggle_theme(val))
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
