@@ -9,3 +9,4 @@ pandas
 openpyxl
 python-pptx
 darkdetect
+kivy
