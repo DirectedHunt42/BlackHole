@@ -1,3 +1,5 @@
 *.ini
 /Log
 /__pycache__
+*.exe
+*
