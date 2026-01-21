@@ -386,7 +386,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.10.3"
+VERSION = "1.11.0"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -1672,6 +1672,7 @@ class PasswordManager(ctk.CTk):
         theme_combo.configure(command=lambda val: self.toggle_theme(val))
         ctk.CTkButton(frame, text="Show Sync Key", command = self.reshow_sync_key_display_popup, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Import Icon Bundle", command=self.import_icon_bundle, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
+        ctk.CTkButton(frame, text="Change Master Password", command=self.change_master_password, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=8)
         ctk.CTkButton(frame, text="About", command=self.show_about, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Check for Updates", command=lambda: self.check_for_update(False), fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=10, padx=10)
         ctk.CTkButton(frame, text="Reset", command=self.reset_app, fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=120).pack(pady=10, padx=10)
@@ -2828,20 +2829,94 @@ class PasswordManager(ctk.CTk):
         except Exception as e:
             print(f"Update check failed: {e}")
 
+    def change_master_password(self):
+        if not self._verify_master_password():
+            return
+        popup = ctk.CTkToplevel(self)
+        popup.title("Change Master Password")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        PasswordManager.set_window_icon(popup)
+        ctk.CTkLabel(popup, text="Change Master Password", font=("Nunito", 16, "bold"), text_color=TEXT).pack(pady=(16,6))
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=20, pady=8, fill="both", expand=False)
+        new_pwd_var = StringVar()
+        new_pwd_lable = ctk.CTkLabel(frame, text="Enter New Master Password:", text_color=TEXT, fg_color=CARD)
+        new_pwd_lable.pack(padx=12, pady=(12,0))
+        new_pwd_entry = ctk.CTkEntry(frame, placeholder_text="New Master Password", show="*", textvariable=new_pwd_var, width=360)
+        new_pwd_entry.pack(padx=12, pady=(12,6))
+        confirm_var = StringVar()
+        confirm_lable = ctk.CTkLabel(frame, text="Confirm New Master Password:", text_color=TEXT, fg_color=CARD)
+        confirm_lable.pack(padx=12, pady=(6,0))
+        confirm_entry = ctk.CTkEntry(frame, placeholder_text="Confirm New Password", show="*", textvariable=confirm_var, width=360)
+        confirm_entry.pack(padx=12, pady=(6,6))
+        def toggle_show():
+            show = "" if new_pwd_entry.cget("show") == "*" else "*"
+            new_pwd_entry.configure(show=show)
+            confirm_entry.configure(show=show)
+        ctk.CTkButton(frame, text="Show/Hide", command=toggle_show, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(pady=(0,10))
+        def change():
+            new_pwd = new_pwd_var.get()
+            confirm = confirm_var.get()
+            if not new_pwd or new_pwd != confirm:
+                messagebox.showerror("Error", "Passwords do not match or empty!", parent=popup)
+                return
+            popup.destroy()
+            self._reencrypt_with_new_password(new_pwd)
+        ctk.CTkButton(popup, text="Change", command=change, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(pady=12)
+        safe_modal(popup)
+        self.wait_window(popup)
+
+    def _reencrypt_with_new_password(self, new_pwd):
+        old_fernet = self.fernet
+        new_key = derive_key(new_pwd, self.salt)
+        new_fernet = Fernet(new_key)
+        progress_popup = ctk.CTkToplevel(self)
+        progress_popup.title("Re-encrypting")
+        progress_popup.configure(fg_color=BG)
+        progress_popup.resizable(False, False)
+        ctk.CTkLabel(progress_popup, text="Re-encrypting passwords...", text_color=TEXT).pack(pady=10)
+        progress_bar = ctk.CTkProgressBar(progress_popup, mode="determinate", width=300)
+        progress_bar.pack(pady=10)
+        progress_bar.set(0)
+        safe_modal(progress_popup)
+        count = self.c.execute("SELECT COUNT(*) FROM passwords").fetchone()[0]
+        if count == 0:
+            progress_popup.destroy()
+            messagebox.showinfo("Success", "Master password changed (no entries to re-encrypt).")
+            self.master_password = new_pwd  # Update in-memory
+            return
+        step = 1.0 / count
+        current = 0
+        rows = self.c.execute("SELECT id, password FROM passwords").fetchall()
+        for id_, pwd_enc in rows:
+            pwd = old_fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
+            new_enc = new_fernet.encrypt(pwd.encode()).decode() if pwd else ""
+            self.c.execute("UPDATE passwords SET password=? WHERE id=?", (new_enc, id_))
+            current += step
+            progress_bar.set(current)
+            progress_popup.update()
+        self.conn.commit()
+        new_verif = new_fernet.encrypt(b"VERIFICATION").decode()
+        self.settings["verification"] = new_verif
+        self._save_settings()
+        self.fernet = new_fernet
+        self.master_password = new_pwd  # Update in-memory for verifies in same session
+        progress_popup.destroy()
+        messagebox.showinfo("Success", "Master password changed and entries re-encrypted.")
+        self.load_cards()  # Reload UI to refresh encrypted values in lambdas
+
     def download_and_install(self, data):
         progress_popup = ctk.CTkToplevel(self)
         progress_popup.title("Downloading Update")
         progress_popup.configure(fg_color=BG)
         progress_popup.resizable(False, False)
-        PasswordManager.set_window_icon(progress_popup)
-        ctk.CTkLabel(progress_popup, text="Downloading update...", font=("Nunito", 14, "bold"), text_color=TEXT, fg_color=BG).pack(pady=(12,12))
-        download_bar = ctk.CTkProgressBar(progress_popup, mode="indeterminate", width=300)
-        download_bar.pack(pady=(0,12))
-        center_popup(progress_popup)
-        progress_popup.update()
-        progress_popup.grab_set()
-        download_bar.start()
-        
+        label = ctk.CTkLabel(progress_popup, text="Downloading update...", text_color=TEXT)
+        label.pack(pady=10)
+        progress_bar = ctk.CTkProgressBar(progress_popup, mode="determinate", width=300)
+        progress_bar.pack(pady=10)
+        progress_bar.set(0)
+        safe_modal(progress_popup)
         q = queue.Queue()
         def download_task():
             try:
@@ -2855,27 +2930,42 @@ class PasswordManager(ctk.CTk):
                     raise Exception("No matching asset found")
                 temp_path = os.path.join(os.getenv("TEMP") or ".", "Black_hole_setup.exe")
                 req = urllib.request.Request(download_url, headers={'User-Agent': 'EchoHub'})
-                with urllib.request.urlopen(req) as response, open(temp_path, 'wb') as out_file:
-                    shutil.copyfileobj(response, out_file)
+                with urllib.request.urlopen(req) as response:
+                    total_size = int(response.headers.get('Content-Length', 0))
+                    downloaded = 0
+                    chunk_size = 1024 * 1024  # 1MB
+                    with open(temp_path, 'wb') as out_file:
+                        while True:
+                            chunk = response.read(chunk_size)
+                            if not chunk: break
+                            out_file.write(chunk)
+                            downloaded += len(chunk)
+                            q.put(('progress', downloaded, total_size))
                 q.put(('success', temp_path))
             except Exception as e:
                 q.put(('error', str(e)))
-        
         threading.Thread(target=download_task, daemon=True).start()
-        
         def process_queue():
             try:
                 result = q.get_nowait()
-                download_bar.stop()
-                progress_popup.destroy()
-                if result[0] == 'success':
+                if result[0] == 'progress':
+                    downloaded, total = result[1], result[2]
+                    if total > 0:
+                        progress_bar.set(downloaded / total)
+                        mb_down = downloaded / (1024 * 1024)
+                        mb_total = total / (1024 * 1024)
+                        label.configure(text=f"Downloading: {mb_down:.2f} / {mb_total:.2f} MB")
+                elif result[0] == 'success':
+                    progress_popup.destroy()
                     os.startfile(result[1])
                     os._exit(0)
-                else:
+                elif result[0] == 'error':
+                    progress_popup.destroy()
                     messagebox.showerror("Error", f"Failed to download update: {result[1]}")
             except queue.Empty:
                 self.after(100, process_queue)
-        
+            else:
+                self.after(100, process_queue)
         self.after(100, process_queue)
         self.wait_window(progress_popup)
 # --- Run App ---
