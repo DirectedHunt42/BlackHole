@@ -57,6 +57,15 @@ Your passwords are stored locally, encrypted, and protected by a single master p
   <a href="https://info.flagcounter.com/TWw2"><img src="https://s01.flagcounter.com/count2/TWw2/bg_0B0F1A/txt_FFFFFF/border_FFFFFF/columns_4/maxflags_20/viewers_0/labels_0/pageviews_1/flags_0/percent_1/" alt="Flag Counter" border="0"></a>
 </div>
 
+
+<a href="https://www.star-history.com/?repos=DirectedHunt42%2FBlackHole&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=DirectedHunt42/BlackHole&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=DirectedHunt42/BlackHole&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=DirectedHunt42/BlackHole&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ---
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-NovaFoundry-6f4e37?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://buymeacoffee.com/novafoundry)
