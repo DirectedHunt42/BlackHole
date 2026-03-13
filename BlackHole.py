@@ -379,6 +379,7 @@ APP_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.ico")
 APP_ICON_PATH_LINUX = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Icon.png")
 BLACK_HOLE_LOGO = os.path.join(SCRIPT_DIR, "Icons", "BlackHole_Transparent_Light.png")
 NOVA_FOUNDRY_LOGO = os.path.join(SCRIPT_DIR, "Icons", "Nova_foundry_wide_transparent.png")
+HAWKING_ICON_PATH = os.path.join(SCRIPT_DIR, "Icons", "Hawking_Icon.png")
 FONT_REGULAR = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Regular.ttf")
 FONT_MEDIUM = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Medium.ttf")
 FONT_BOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Black.ttf")
@@ -1482,10 +1483,10 @@ class PasswordManager(ctk.CTk):
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         export_btn.pack(side="right", padx=4)
         Tooltip(export_btn, "Export Vault")
-        import_btn = ctk.CTkButton(header, text="📥", command=self.import_spreadsheet,
+        import_btn = ctk.CTkButton(header, text="📥", command=self.import_popup,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         import_btn.pack(side="right", padx=4)
-        Tooltip(import_btn, "Import from Spreadsheet")
+        Tooltip(import_btn, "Import")
         help_btn = ctk.CTkButton(header, text="❓", command=self.show_help,
                        fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=12, font=("Nunito", 12))
         help_btn.pack(side="right", padx=4)
@@ -1552,6 +1553,40 @@ class PasswordManager(ctk.CTk):
             else:
                 self.back_to_top_btn.place(relx=0.5, rely=0.95, anchor="center")
         step()
+    def import_popup(self):
+        popup = ctk.CTkToplevel(self)
+        popup.title("Import")
+        popup.configure(fg_color=BG)
+        popup.resizable(False, False)
+        PasswordManager.set_window_icon(popup)
+
+        ctk.CTkLabel(popup, text="Import Options", font=("Nunito", 16, "bold"),
+                     text_color=TEXT).pack(pady=(14, 6))
+        frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
+        frame.pack(padx=16, pady=(0, 12), fill="both", expand=True)
+
+        def open_import_passwords():
+            popup.destroy()
+            self.after(50, self.import_spreadsheet)
+
+        def open_import_icons():
+            popup.destroy()
+            self.after(50, self.import_icon_bundle)
+
+        def open_decode_singularity():
+            popup.destroy()
+            self.after(50, self.decode_singularity)
+
+        ctk.CTkButton(frame, text="Import Passwords (Spreadsheet)", command=open_import_passwords,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=260).pack(pady=(12, 6), padx=12)
+        ctk.CTkButton(frame, text="Import Icon Pack (.hawking)", command=open_import_icons,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=260).pack(pady=(0, 12), padx=12)
+        ctk.CTkButton(frame, text="Decode Singularity (.singularity)", command=open_decode_singularity,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=260).pack(pady=(0, 12), padx=12)
+
+        safe_modal(popup)
+        self.wait_window(popup)
+
     def import_spreadsheet(self):
         file_path = filedialog.askopenfilename(title="Select Spreadsheet", filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv")])
         if not file_path:
@@ -1631,6 +1666,141 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Import", command=do_import, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,12))
         safe_modal(popup)
         self.wait_window(popup)
+
+    def decode_singularity(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Singularity Vault",
+            filetypes=[("Singularity Vault", "*.singularity")]
+        )
+        if not file_path:
+            return
+
+        progress_popup = ctk.CTkToplevel(self)
+        progress_popup.title("Loading Singularity")
+        progress_popup.configure(fg_color=BG)
+        progress_popup.resizable(False, False)
+        PasswordManager.set_window_icon(progress_popup)
+        ctk.CTkLabel(progress_popup, text="Loading singularity file...",
+                     font=("Nunito", 14, "bold"), text_color=TEXT).pack(pady=(12, 6), padx=16)
+        progress_bar = ctk.CTkProgressBar(progress_popup, width=320, mode="indeterminate")
+        progress_bar.pack(pady=(0, 12), padx=16)
+        progress_bar.start()
+        safe_modal(progress_popup)
+        progress_popup.update_idletasks()
+
+        try:
+            conn = sqlite3.connect(file_path)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='passwords'")
+            if not cur.fetchone():
+                raise Exception("Missing passwords table")
+        except Exception as e:
+            progress_bar.stop()
+            progress_popup.destroy()
+            messagebox.showerror("Error", f"Invalid singularity file: {e}")
+            return
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        progress_bar.stop()
+        progress_popup.destroy()
+        self._singularity_export_popup(file_path)
+
+    def _singularity_export_popup(self, file_path):
+        popup = ctk.CTkToplevel(self)
+        popup.title("Decode Singularity")
+        popup.configure(fg_color=BG)
+        popup.geometry("920x500")
+        popup.resizable(False, False)
+        PasswordManager.set_window_icon(popup)
+
+        ctk.CTkLabel(popup, text="Export From Singularity", font=("Nunito", 14, "bold"),
+                     text_color=TEXT, fg_color=BG).pack(pady=(12, 6))
+        export_frame = ctk.CTkScrollableFrame(popup, fg_color=BG, width=400, height=210)
+        export_frame.pack(pady=12, padx=12, fill="both", expand=True)
+
+        def add_section(parent, name):
+            section = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=8)
+            section.pack(fill="x", pady=10, padx=10)
+            ctk.CTkLabel(section, text=name, font=("Nunito", 16, "bold"),
+                         text_color=TEXT).pack(pady=5)
+            btn_frame = ctk.CTkFrame(section, fg_color=CARD)
+            btn_frame.pack(pady=5)
+            return btn_frame
+
+        def run_export(export_func):
+            self._run_singularity_export(file_path, export_func)
+
+        doc_btns = add_section(export_frame, "Documents")
+        ctk.CTkButton(doc_btns, text=".docx", command=lambda: run_export(self.export_docx),
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
+                      width=120).pack(side="left", padx=5)
+        ctk.CTkButton(doc_btns, text=".odt", command=lambda: run_export(self.export_odt),
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
+                      width=120).pack(side="left", padx=5)
+        ctk.CTkButton(doc_btns, text=".txt", command=lambda: run_export(self.export_txt),
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
+                      width=120).pack(side="left", padx=5)
+
+        sheet_btns = add_section(export_frame, "Spreadsheets")
+        ctk.CTkButton(sheet_btns, text=".xlsx", command=lambda: run_export(self.export_xlsx),
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
+                      width=120).pack(side="left", padx=5)
+        ctk.CTkButton(sheet_btns, text=".ods", command=lambda: run_export(self.export_ods),
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
+                      width=120).pack(side="left", padx=5)
+        ctk.CTkButton(sheet_btns, text=".csv", command=lambda: run_export(self.export_csv),
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
+                      width=120).pack(side="left", padx=5)
+
+        ctk.CTkButton(popup, text="Close", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
+
+        def fix_scrollable_frame(sf):
+            sf.update_idletasks()
+            sf._parent_canvas.configure(scrollregion=sf._parent_canvas.bbox("all"))
+            sf._parent_canvas.xview_moveto(0)
+            sf._parent_canvas.yview_moveto(0)
+
+        safe_modal(popup)
+        self.after(50, lambda: fix_scrollable_frame(export_frame))
+        self.wait_window(popup)
+
+    def _run_singularity_export(self, file_path, export_func):
+        progress_popup = ctk.CTkToplevel(self)
+        progress_popup.title("Exporting")
+        progress_popup.configure(fg_color=BG)
+        progress_popup.resizable(False, False)
+        PasswordManager.set_window_icon(progress_popup)
+        ctk.CTkLabel(progress_popup, text="Exporting...",
+                     font=("Nunito", 14, "bold"), text_color=TEXT).pack(pady=(12, 6), padx=16)
+        progress_bar = ctk.CTkProgressBar(progress_popup, width=300, mode="indeterminate")
+        progress_bar.pack(pady=(0, 12), padx=16)
+        progress_bar.start()
+        progress_popup.update_idletasks()
+
+        old_conn = self.conn
+        old_c = self.c
+        old_db_path = self.db_path
+
+        try:
+            self.conn = sqlite3.connect(file_path)
+            self.c = self.conn.cursor()
+            self.db_path = file_path
+            export_func()
+        finally:
+            try:
+                if self.conn:
+                    self.conn.close()
+            except Exception:
+                pass
+            self.conn = old_conn
+            self.c = old_c
+            self.db_path = old_db_path
+            progress_bar.stop()
+            progress_popup.destroy()
     # --- Settings Popup ---
     def show_settings_popup(self):
         popup = ctk.CTkToplevel(self)
@@ -1769,21 +1939,57 @@ class PasswordManager(ctk.CTk):
 
         proceed = messagebox.askyesno(
             "Warning",
-            "Importing this archive may overwrite existing icons in the stored icons directory. Do you want to proceed?"
+            "Importing this archive will merge icon folders in local app data and overwrite files with the same name. Do you want to proceed?"
         )
         if not proceed:
             return
 
+        progress_popup = ctk.CTkToplevel(self)
+        progress_popup.title("Importing Icons")
+        progress_popup.configure(fg_color=BG)
+        progress_popup.resizable(False, False)
+        PasswordManager.set_window_icon(progress_popup)
+        ctk.CTkLabel(progress_popup, text="Importing icon pack...",
+                     font=("Nunito", 14, "bold"), text_color=TEXT).pack(pady=(12, 6), padx=16)
+        progress_bar = ctk.CTkProgressBar(progress_popup, width=320)
+        progress_bar.pack(pady=(0, 12), padx=16)
+        progress_bar.set(0)
+        safe_modal(progress_popup)
+        progress_popup.update_idletasks()
+
         count = 0
+        dest_root = os.path.normpath(stored_icons_path)
         with zipfile.ZipFile(import_file, "r") as archive:
-            for member in archive.namelist():
-                archive.extract(member, stored_icons_path)
+            members_to_extract = []
+            for member in archive.infolist():
+                name = member.filename.replace("\\", "/").lstrip("/").lstrip("\\")
+                if not name:
+                    continue
+                target_path = os.path.normpath(os.path.join(dest_root, name))
+                if not target_path.startswith(dest_root + os.sep) and target_path != dest_root:
+                    continue
+                if member.is_dir():
+                    os.makedirs(target_path, exist_ok=True)
+                    continue
+                members_to_extract.append((member, target_path))
+
+            total = len(members_to_extract)
+            for i, (member, target_path) in enumerate(members_to_extract, start=1):
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                with archive.open(member, "r") as src, open(target_path, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
                 count += 1
+                if total > 0:
+                    progress_bar.set(i / total)
+                    progress_popup.update_idletasks()
+
+        progress_popup.destroy()
 
         messagebox.showinfo(
             "Imported",
             f"Imported {count} icons from\n{import_file}"
         )
+        self.load_cards()
     def _change_sort(self, event=None):
         val = self.sort_var.get()
         if val == "Title A-Z":
@@ -2380,10 +2586,13 @@ class PasswordManager(ctk.CTk):
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
         ctk.CTkButton(slide_btns, text=".pptx", command=self.export_pptx,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=120).pack(side="left", padx=5)
-        ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
         icon_export = add_section(export_frame, "Icons")
         ctk.CTkButton(icon_export, text="Export Icon Bundle", command=self.export_icons,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=180).pack(pady=5)
+        db_export = add_section(export_frame, "Database")
+        ctk.CTkButton(db_export, text=".singularity", command=self.export_singularity,
+                      fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=180).pack(pady=5)
+        ctk.CTkButton(popup, text="Cancel", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
         def fix_scrollable_frame(sf):
             sf.update_idletasks()
             sf._parent_canvas.configure(scrollregion=sf._parent_canvas.bbox("all"))
@@ -2679,6 +2888,27 @@ class PasswordManager(ctk.CTk):
         if path:
             prs.save(path)
             messagebox.showinfo("Exported", f"Exported to {path}")
+    def export_singularity(self):
+        if not self._verify_master_password():
+            return
+        if not self.db_path or not os.path.exists(self.db_path):
+            messagebox.showerror("Error", "Database file not found.")
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".singularity",
+                                             filetypes=[("Singularity Vault", "*.singularity")])
+        if not path:
+            return
+        try:
+            if self.conn:
+                dest = sqlite3.connect(path)
+                self.conn.backup(dest)
+                dest.close()
+            else:
+                shutil.copy2(self.db_path, path)
+            messagebox.showinfo("Exported", f"Exported to {path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Export failed: {e}")
+
     def export_icons(self):
         export_dir = filedialog.askdirectory(title="Select Export Directory for Icons")
         if not export_dir:

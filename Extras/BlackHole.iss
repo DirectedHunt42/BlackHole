@@ -55,5 +55,17 @@ Source: "C:\Users\jackp\Downloads\BlackHole\*"; DestDir: "{app}"; Flags: ignorev
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
+[Registry]
+Root: HKCR; Subkey: ".hawking"; ValueType: string; ValueName: ""; ValueData: "BlackHole.Hawking"; Flags: uninsdeletevalue
+Root: HKCR; Subkey: "BlackHole.Hawking"; ValueType: string; ValueName: ""; ValueData: "Hawking Icon Pack"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "BlackHole.Hawking\\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\\Icons\\Hawking_Icon.ico"
+Root: HKCR; Subkey: "BlackHole.Hawking\\shell\\open\\command"; ValueType: string; ValueName: ""; ValueData: "\"{app}\\{#MyAppExeName}\" \"%1\""
+Root: HKCR; Subkey: ".singularity"; ValueType: string; ValueName: ""; ValueData: "BlackHole.Singularity"; Flags: uninsdeletevalue
+Root: HKCR; Subkey: ".signularity"; ValueType: string; ValueName: ""; ValueData: "BlackHole.Singularity"; Flags: uninsdeletevalue
+Root: HKCR; Subkey: ".sungularity"; ValueType: string; ValueName: ""; ValueData: "BlackHole.Singularity"; Flags: uninsdeletevalue
+Root: HKCR; Subkey: "BlackHole.Singularity"; ValueType: string; ValueName: ""; ValueData: "Singularity Vault"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "BlackHole.Singularity\\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\\Icons\\Singularity_Icon.ico"
+Root: HKCR; Subkey: "BlackHole.Singularity\\shell\\open\\command"; ValueType: string; ValueName: ""; ValueData: "\"{app}\\{#MyAppExeName}\" \"%1\""
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
