@@ -83,6 +83,9 @@ if exist "%LOG_DIR%\build" rmdir /s /q "%LOG_DIR%\build"
 del /q "%LOG_DIR%\*.spec" 2>nul
 del /q "%LOG_DIR%\*.log" 2>nul
 del /q "%LOG_DIR%\*.sln" 2>nul
+REM Recreate required build folders
+mkdir "%LOG_DIR%\build" 2>nul
+mkdir "%LOG_DIR%\dist" 2>nul
 REM 5. Process requirements.txt for hidden imports
 echo ---
 echo Setting up hidden imports for PyInstaller...
