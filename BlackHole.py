@@ -22,7 +22,7 @@ from odf.draw import Page, Frame, TextBox, Image
 from odf.style import MasterPage
 from PIL import Image, ImageTk, ImageDraw
 import urllib
-import urllib.request  # Added for potential server calls
+import urllib.request # Added for potential server calls
 import ctypes
 import queue
 import openpyxl
@@ -31,9 +31,9 @@ from pptx import Presentation
 from pptx.util import Inches
 import platform
 import darkdetect
-import secrets  # Added for password generator
-import string   # Added for password generator
-import hashlib  # Added for simple key hashing
+import secrets # Added for password generator
+import string # Added for password generator
+import hashlib # Added for simple key hashing
 # Lightweight bootstrap logger used during early startup (before full app logger exists)
 def _bootstrap_log(msg: str):
     try:
@@ -56,7 +56,6 @@ def _bootstrap_log(msg: str):
             print(f"BlackHole log: {msg}", file=sys.stderr, flush=True)
         except Exception:
             pass
-
 if platform.system() == "Windows":
     from ctypes import *
     from ctypes.wintypes import *
@@ -338,7 +337,7 @@ if platform.system() == "Windows":
                                 kernel32.GetExitCodeProcess.restype = BOOL
                                 exit_code = DWORD()
                                 if kernel32.GetExitCodeProcess(ph, byref(exit_code)):
-                                    if exit_code.value != 259:  # STILL_ACTIVE
+                                    if exit_code.value != 259: # STILL_ACTIVE
                                         _bootstrap_log(f"Process pid {p} is not active anymore, exit_code={exit_code.value}")
                                     else:
                                         _bootstrap_log(f"Process pid {p} still active (STILL_ACTIVE). Attempting TerminateProcess")
@@ -387,7 +386,7 @@ FONT_LIGHT = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Light.ttf")
 FONT_ITALIC = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-Italic.ttf")
 FONT_SEMIBOLD = os.path.join(SCRIPT_DIR, "Fonts", "Nunito-SemiBold.ttf")
 LICENSE_TEXT = os.path.join(SCRIPT_DIR, "LICENSE.txt")
-VERSION = "1.12.0"
+VERSION = "1.12.1"
 # Load all the font files for Tkinter (on Windows)
 if platform.system() == "Windows":
     fonts = [FONT_REGULAR, FONT_MEDIUM, FONT_BOLD, FONT_LIGHT, FONT_ITALIC, FONT_SEMIBOLD]
@@ -497,6 +496,7 @@ def safe_modal(popup):
         popup.grab_set()
 # --- Password Manager App ---
 class PasswordManager(ctk.CTk):
+    @staticmethod
     def set_window_icon(window):
         if platform.system() == "Windows" and os.path.exists(APP_ICON_PATH):
             try:
@@ -524,7 +524,6 @@ class PasswordManager(ctk.CTk):
             if os.path.exists(APP_ICON_PATH_LINUX):
                 img = Image.open(APP_ICON_PATH_LINUX)
                 window.iconphoto(True, ImageTk.PhotoImage(img))
- 
     def __init__(self):
         super().__init__()
         # load settings first (to get theme preference)
@@ -539,11 +538,11 @@ class PasswordManager(ctk.CTk):
                     self.db_path = self.settings["db_path"]
             except Exception:
                 self.settings = {"master_password_set": False}
-     
+   
         # Apply theme based on settings (default to 'system' if not set)
         theme_pref = self.settings.get("theme", "system")
         self._apply_theme(theme_pref)
-     
+   
         # Hide main window until auth succeeds
         self.title("Black Hole Password Manager")
         self.geometry("900x560")
@@ -558,6 +557,7 @@ class PasswordManager(ctk.CTk):
         self.c = None
         self.authenticated = False
         self.ui_built = False
+        self.in_singularity_export = False
         # load settings
         self.settings = {"master_password_set": False}
         if os.path.exists(settings_path):
@@ -1128,8 +1128,7 @@ class PasswordManager(ctk.CTk):
             try:
                 key = derive_key(pwd, self.salt)
                 fernet_test = Fernet(key)
-                # For import, no verification yet, so skip or assume
-                # For normal unlock, check verification
+                # For import / singularity, no verification yet, so skip or assume
                 if "verification" in self.settings:
                     verif_dec = fernet_test.decrypt(self.settings["verification"].encode()).decode()
                     if verif_dec != "VERIFICATION":
@@ -1154,6 +1153,8 @@ class PasswordManager(ctk.CTk):
         # This is for normal unlock after setup
         return self._show_master_unlock_modal()
     def _verify_master_password(self, icon_id=None):
+        if getattr(self, 'in_singularity_export', False):
+            return True
         popup = ctk.CTkToplevel(self)
         popup.grab_set()
         popup.title("Black Hole - Master Password")
@@ -1389,7 +1390,7 @@ class PasswordManager(ctk.CTk):
     def _apply_theme(self, theme_mode):
         """Apply theme based on mode: 'light', 'dark', or 'system'"""
         global current_theme, BG, CARD, CARD_HOVER, ACCENT, ACCENT_DIM, TEXT, BLACK_HOLE_WIDE_LOGO
-     
+   
         if theme_mode == "system":
             # Use CTK default appearance (respects system settings)
             ctk.set_appearance_mode("system")
@@ -1397,10 +1398,10 @@ class PasswordManager(ctk.CTk):
             ctk.set_appearance_mode("light")
         else: # "dark" or any other value defaults to dark
             ctk.set_appearance_mode("dark")
-     
+   
         # Detect the actual appearance mode
         current_theme = "dark" if ctk.get_appearance_mode() == "Dark" else "light"
-     
+   
         # Update global color variables
         theme_colors = THEMES[current_theme]
         BG = theme_colors["BG"]
@@ -1410,7 +1411,7 @@ class PasswordManager(ctk.CTk):
         ACCENT_DIM = theme_colors["ACCENT_DIM"]
         TEXT = theme_colors["TEXT"]
         BLACK_HOLE_WIDE_LOGO = theme_colors["BLACK_HOLE_WIDE_LOGO"]
-     
+   
         try:
             ctk.set_default_color_theme("dark-blue")
         except Exception:
@@ -1442,17 +1443,17 @@ class PasswordManager(ctk.CTk):
         self.search_entry.pack(side="left", fill="x", expand=True)
         self.search_timer = None
         self.search_entry.bind("<KeyRelease>", lambda e: self.debounced_search())
-     
+   
         # Search button
         self.search_btn = ctk.CTkButton(search_subframe, text="🔎", command=self.load_cards,
                                          fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=32, font=("Nunito", 12))
         self.search_btn.pack(side="left", padx=(5, 2))
-     
+   
         # Clear button
         self.clear_search_btn = ctk.CTkButton(search_subframe, text="❌", command=self._clear_search,
                                                fg_color="#ff4d4d", text_color=BG, hover_color="#ff0000", width=32, font=("Nunito", 12))
         self.clear_search_btn.pack(side="left", padx=(2, 0))
-     
+   
         self._update_search_buttons()
         # Sort options
         sort_frame = ctk.CTkFrame(header, fg_color=BG)
@@ -1507,9 +1508,9 @@ class PasswordManager(ctk.CTk):
         self.cards_frame.pack(padx=12, pady=12, fill="both", expand=True)
         # Back to top button
         self.back_to_top_btn = ctk.CTkButton(self, text="Back to Top", command=self.scroll_to_top, width=140, height=50, fg_color=ACCENT, text_color=BG, font=("Nunito", 14, "bold"), corner_radius=0, border_width=2, border_color=BG)
-        self.back_to_top_btn.place(relx=0.5, rely=1.0, anchor="center")  # start below screen
-        self.back_to_top_btn.place_forget()  # hide initially
-        self.after(100, self.check_back_to_top)  # start checking scroll position
+        self.back_to_top_btn.place(relx=0.5, rely=1.0, anchor="center") # start below screen
+        self.back_to_top_btn.place_forget() # hide initially
+        self.after(100, self.check_back_to_top) # start checking scroll position
         # Keyboard bindings for main window
         self.bind("<Control-f>", lambda e: self.search_entry.focus())
         self.bind("<Control-s>", lambda e: self.export_popup())
@@ -1534,15 +1535,15 @@ class PasswordManager(ctk.CTk):
             self.check_back_to_top()
     def check_back_to_top(self):
         yview = self.cards_frame._parent_canvas.yview()
-        if yview[0] > 0.1:  # scrolled down more than 10%
-            if not self.back_to_top_btn.winfo_ismapped():  # if not visible
+        if yview[0] > 0.1: # scrolled down more than 10%
+            if not self.back_to_top_btn.winfo_ismapped(): # if not visible
                 self.animate_button_in()
         else:
             self.back_to_top_btn.place_forget()
         self.after(100, self.check_back_to_top)
     def animate_button_in(self):
         self.back_to_top_btn.place(relx=0.5, rely=1.0, anchor="center")
-        self.back_to_top_btn.lift()  # bring to front
+        self.back_to_top_btn.lift() # bring to front
         current = 1.0
         def step():
             nonlocal current
@@ -1559,34 +1560,27 @@ class PasswordManager(ctk.CTk):
         popup.configure(fg_color=BG)
         popup.resizable(False, False)
         PasswordManager.set_window_icon(popup)
-
         ctk.CTkLabel(popup, text="Import Options", font=("Nunito", 16, "bold"),
                      text_color=TEXT).pack(pady=(14, 6))
         frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8)
         frame.pack(padx=16, pady=(0, 12), fill="both", expand=True)
-
         def open_import_passwords():
             popup.destroy()
             self.after(50, self.import_spreadsheet)
-
         def open_import_icons():
             popup.destroy()
             self.after(50, self.import_icon_bundle)
-
         def open_decode_singularity():
             popup.destroy()
             self.after(50, self.decode_singularity)
-
         ctk.CTkButton(frame, text="Import Passwords (Spreadsheet)", command=open_import_passwords,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=260).pack(pady=(12, 6), padx=12)
         ctk.CTkButton(frame, text="Import Icon Pack (.hawking)", command=open_import_icons,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=260).pack(pady=(0, 12), padx=12)
         ctk.CTkButton(frame, text="Decode Singularity (.singularity)", command=open_decode_singularity,
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=260).pack(pady=(0, 12), padx=12)
-
         safe_modal(popup)
         self.wait_window(popup)
-
     def import_spreadsheet(self):
         file_path = filedialog.askopenfilename(title="Select Spreadsheet", filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv")])
         if not file_path:
@@ -1666,7 +1660,6 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Import", command=do_import, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM).pack(pady=(0,12))
         safe_modal(popup)
         self.wait_window(popup)
-
     def decode_singularity(self):
         file_path = filedialog.askopenfilename(
             title="Select Singularity Vault",
@@ -1674,7 +1667,6 @@ class PasswordManager(ctk.CTk):
         )
         if not file_path:
             return
-
         progress_popup = ctk.CTkToplevel(self)
         progress_popup.title("Loading Singularity")
         progress_popup.configure(fg_color=BG)
@@ -1687,7 +1679,6 @@ class PasswordManager(ctk.CTk):
         progress_bar.start()
         safe_modal(progress_popup)
         progress_popup.update_idletasks()
-
         try:
             conn = sqlite3.connect(file_path)
             cur = conn.cursor()
@@ -1704,24 +1695,66 @@ class PasswordManager(ctk.CTk):
                 conn.close()
             except Exception:
                 pass
-
         progress_bar.stop()
         progress_popup.destroy()
-        self._singularity_export_popup(file_path)
 
-    def _singularity_export_popup(self, file_path):
+        # === NEW: Prompt for singularity-specific sync key + master password ===
+        old_salt = self.salt
+        old_fernet = self.fernet
+        old_master = self.master_password
+        old_verif = self.settings.get("verification")
+        foreign_fernet = None
+        success = False
+        try:
+            # 1. Sync key (salt)
+            if not self._show_sync_key_modal():
+                return
+            foreign_salt_temp = self.salt
+
+            # Temporarily remove verification so unlock modal skips check
+            if "verification" in self.settings:
+                del self.settings["verification"]
+
+            # 2. Master password
+            if not self._show_master_unlock_modal():
+                return
+            foreign_fernet = self.fernet
+
+            # 3. Quick sanity test: try to decrypt one password from the singularity DB
+            temp_conn = sqlite3.connect(file_path)
+            temp_c = temp_conn.cursor()
+            row = temp_c.execute("SELECT password FROM passwords WHERE password IS NOT NULL LIMIT 1").fetchone()
+            temp_conn.close()
+            if row and row[0]:
+                foreign_fernet.decrypt(row[0].encode())  # will raise if wrong key
+
+            success = True
+        except Exception as e:
+            messagebox.showerror("Error", f"Incorrect sync key or master password for this singularity vault!\n\n{e}")
+            return
+        finally:
+            # Restore original vault state
+            self.salt = old_salt
+            self.fernet = old_fernet
+            self.master_password = old_master
+            if old_verif is not None:
+                self.settings["verification"] = old_verif
+            else:
+                self.settings.pop("verification", None)
+
+        if success and foreign_fernet:
+            self._singularity_export_popup(file_path, foreign_fernet=foreign_fernet)
+    def _singularity_export_popup(self, file_path, foreign_fernet=None):
         popup = ctk.CTkToplevel(self)
         popup.title("Decode Singularity")
         popup.configure(fg_color=BG)
         popup.geometry("920x500")
         popup.resizable(False, False)
         PasswordManager.set_window_icon(popup)
-
         ctk.CTkLabel(popup, text="Export From Singularity", font=("Nunito", 14, "bold"),
                      text_color=TEXT, fg_color=BG).pack(pady=(12, 6))
         export_frame = ctk.CTkScrollableFrame(popup, fg_color=BG, width=400, height=210)
         export_frame.pack(pady=12, padx=12, fill="both", expand=True)
-
         def add_section(parent, name):
             section = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=8)
             section.pack(fill="x", pady=10, padx=10)
@@ -1730,10 +1763,8 @@ class PasswordManager(ctk.CTk):
             btn_frame = ctk.CTkFrame(section, fg_color=CARD)
             btn_frame.pack(pady=5)
             return btn_frame
-
         def run_export(export_func):
-            self._run_singularity_export(file_path, export_func)
-
+            self._run_singularity_export(file_path, export_func, foreign_fernet=foreign_fernet)
         doc_btns = add_section(export_frame, "Documents")
         ctk.CTkButton(doc_btns, text=".docx", command=lambda: run_export(self.export_docx),
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
@@ -1744,7 +1775,6 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(doc_btns, text=".txt", command=lambda: run_export(self.export_txt),
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
                       width=120).pack(side="left", padx=5)
-
         sheet_btns = add_section(export_frame, "Spreadsheets")
         ctk.CTkButton(sheet_btns, text=".xlsx", command=lambda: run_export(self.export_xlsx),
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
@@ -1755,20 +1785,16 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(sheet_btns, text=".csv", command=lambda: run_export(self.export_csv),
                       fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM,
                       width=120).pack(side="left", padx=5)
-
         ctk.CTkButton(popup, text="Close", command=popup.destroy, fg_color="#3a3a3a", width=120).pack(pady=12)
-
         def fix_scrollable_frame(sf):
             sf.update_idletasks()
             sf._parent_canvas.configure(scrollregion=sf._parent_canvas.bbox("all"))
             sf._parent_canvas.xview_moveto(0)
             sf._parent_canvas.yview_moveto(0)
-
         safe_modal(popup)
         self.after(50, lambda: fix_scrollable_frame(export_frame))
         self.wait_window(popup)
-
-    def _run_singularity_export(self, file_path, export_func):
+    def _run_singularity_export(self, file_path, export_func, foreign_fernet=None):
         progress_popup = ctk.CTkToplevel(self)
         progress_popup.title("Exporting")
         progress_popup.configure(fg_color=BG)
@@ -1780,15 +1806,18 @@ class PasswordManager(ctk.CTk):
         progress_bar.pack(pady=(0, 12), padx=16)
         progress_bar.start()
         progress_popup.update_idletasks()
-
         old_conn = self.conn
         old_c = self.c
         old_db_path = self.db_path
-
+        old_fernet = self.fernet
+        old_in_singularity = getattr(self, 'in_singularity_export', False)
         try:
             self.conn = sqlite3.connect(file_path)
             self.c = self.conn.cursor()
             self.db_path = file_path
+            if foreign_fernet is not None:
+                self.fernet = foreign_fernet
+                self.in_singularity_export = True
             export_func()
         finally:
             try:
@@ -1799,6 +1828,8 @@ class PasswordManager(ctk.CTk):
             self.conn = old_conn
             self.c = old_c
             self.db_path = old_db_path
+            self.fernet = old_fernet
+            self.in_singularity_export = old_in_singularity
             progress_bar.stop()
             progress_popup.destroy()
     # --- Settings Popup ---
@@ -1936,14 +1967,12 @@ class PasswordManager(ctk.CTk):
         )
         if not import_file:
             return
-
         proceed = messagebox.askyesno(
             "Warning",
             "Importing this archive will merge icon folders in local app data and overwrite files with the same name. Do you want to proceed?"
         )
         if not proceed:
             return
-
         progress_popup = ctk.CTkToplevel(self)
         progress_popup.title("Importing Icons")
         progress_popup.configure(fg_color=BG)
@@ -1956,7 +1985,6 @@ class PasswordManager(ctk.CTk):
         progress_bar.set(0)
         safe_modal(progress_popup)
         progress_popup.update_idletasks()
-
         count = 0
         dest_root = os.path.normpath(stored_icons_path)
         with zipfile.ZipFile(import_file, "r") as archive:
@@ -1972,7 +2000,6 @@ class PasswordManager(ctk.CTk):
                     os.makedirs(target_path, exist_ok=True)
                     continue
                 members_to_extract.append((member, target_path))
-
             total = len(members_to_extract)
             for i, (member, target_path) in enumerate(members_to_extract, start=1):
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -1982,9 +2009,7 @@ class PasswordManager(ctk.CTk):
                 if total > 0:
                     progress_bar.set(i / total)
                     progress_popup.update_idletasks()
-
         progress_popup.destroy()
-
         messagebox.showinfo(
             "Imported",
             f"Imported {count} icons from\n{import_file}"
@@ -2020,7 +2045,6 @@ class PasswordManager(ctk.CTk):
         self._rebuild_cards()
         # Scroll to top
         self.cards_frame._parent_canvas.yview_moveto(0)
- 
     def _rebuild_cards(self):
         """Internal method that rebuilds the cards grid"""
         search_term = self.search_var.get().strip().lower()
@@ -2059,12 +2083,12 @@ class PasswordManager(ctk.CTk):
             case _:
                 num_columns = 1
         self.cards_frame.grid_columnconfigure(tuple(range(num_columns)), weight=1)
-     
+   
         # Show appropriate message if empty
         if not rows:
             no_results_frame = ctk.CTkFrame(self.cards_frame, fg_color=BG)
             no_results_frame.grid(row=0, column=0, columnspan=num_columns, sticky="nsew", padx=20, pady=40)
-         
+       
             if not all_rows:
                 # Database is completely empty
                 ctk.CTkLabel(no_results_frame, text="No passwords yet", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
@@ -2074,7 +2098,7 @@ class PasswordManager(ctk.CTk):
                 ctk.CTkLabel(no_results_frame, text="No results found", font=("Nunito", 16, "bold"), text_color=ACCENT_DIM).pack(pady=20)
                 ctk.CTkLabel(no_results_frame, text="Try adjusting your search", font=("Nunito", 12), text_color=ACCENT_DIM).pack()
             return
-     
+   
         for i, row in enumerate(rows):
             id_, title, user, pwd_enc, notes = row
             shadow_frame = ctk.CTkFrame(self.cards_frame, fg_color="gray20", width=360, height=470, border_width=0, corner_radius=0)
@@ -2151,7 +2175,7 @@ class PasswordManager(ctk.CTk):
                     var.set("********")
                     label.configure(text=f"🗐 Password: ********")
                     shown[0] = False
-              
+            
             # FIX: Use lambda to pass the necessary arguments, including the pwd_label object
             ctk.CTkButton(right, text="Show",
                         command=lambda enc=pwd_enc, v=pwd_var, l=pwd_label, s=is_shown: toggle_show(enc, v, l, s),
@@ -2172,7 +2196,6 @@ class PasswordManager(ctk.CTk):
         else:
             self.search_btn.pack_forget()
             self.clear_search_btn.pack_forget()
- 
     def _clear_search(self):
         """Clear the search entry and reload cards"""
         self.search_var.set("")
@@ -2249,16 +2272,16 @@ class PasswordManager(ctk.CTk):
             colors = {"Weak": "#ff0000", "Medium": "#ffa500", "Strong": "#00ff00"}
             strength_label.configure(text=f"Strength: {strength}", text_color=colors[strength])
         pwd_var.trace_add("write", update_strength)
-        update_strength()  # Initial
+        update_strength() # Initial
         # Password generator button
         def generate_password():
             if not messagebox.askyesno("Generate Password", "This will overwrite the current password. Continue?", parent=popup):
                 return
-            length = 16  # Default; can add options popup
+            length = 16 # Default; can add options popup
             chars = string.ascii_letters + string.digits + string.punctuation
             new_pwd = ''.join(secrets.choice(chars) for _ in range(length))
             pwd_var.set(new_pwd)
-            pwd_entry.configure(show="*")  # Reset show
+            pwd_entry.configure(show="*") # Reset show
         ctk.CTkButton(popup, text="Generate Password", command=generate_password, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         def toggle_pwd_entry():
             pwd_entry.configure(show="" if pwd_entry.cget("show")=="*" else "*")
@@ -2273,28 +2296,28 @@ class PasswordManager(ctk.CTk):
             if not file:
                 return
             original_img = Image.open(file)
-            editor_popup = ctk.CTkToplevel(popup)  # 'popup' is the edit_card_popup window
+            editor_popup = ctk.CTkToplevel(popup) # 'popup' is the edit_card_popup window
             editor_popup.title("Crop and Zoom Image")
             editor_popup.configure(fg_color=BG)
             editor_popup.resizable(False, False)
             PasswordManager.set_window_icon(editor_popup)
-            
+          
             canvas_size = 350
             center = canvas_size / 2
             zoom_level = 1.0
             image_x = center
             image_y = center
-            photo = None  # To keep reference
+            photo = None # To keep reference
             start_pan_x = 0
             start_pan_y = 0
             start_image_x = 0
             start_image_y = 0
-            
+          
             canvas_frame = ctk.CTkFrame(editor_popup, fg_color=CARD)
             canvas_frame.pack(pady=10, padx=10)
             canvas = ctk.CTkCanvas(canvas_frame, width=canvas_size, height=canvas_size, bg="gray")
             canvas.pack()
-            
+          
             def display_image():
                 nonlocal photo
                 w, h = original_img.size
@@ -2304,9 +2327,9 @@ class PasswordManager(ctk.CTk):
                 photo = ImageTk.PhotoImage(resized)
                 canvas.delete("all")
                 canvas.create_image(image_x, image_y, image=photo, anchor="center")
-            
+          
             display_image()
-            
+          
             def zoom_at(mx, my, scale):
                 nonlocal zoom_level, image_x, image_y
                 old_zoom = zoom_level
@@ -2315,26 +2338,26 @@ class PasswordManager(ctk.CTk):
                 image_x = mx - (mx - image_x) * (zoom_level / old_zoom)
                 image_y = my - (my - image_y) * (zoom_level / old_zoom)
                 display_image()
-            
+          
             def zoom_in_center():
                 zoom_at(center, center, 1.2)
-            
+          
             def zoom_out_center():
                 zoom_at(center, center, 1 / 1.2)
-            
+          
             def on_mouse_wheel(event):
                 mx = canvas.winfo_pointerx() - canvas.winfo_rootx()
                 my = canvas.winfo_pointery() - canvas.winfo_rooty()
                 scale = 1.1 if event.delta > 0 else 1 / 1.1
                 zoom_at(mx, my, scale)
-            
+          
             def start_pan(event):
                 nonlocal start_pan_x, start_pan_y, start_image_x, start_image_y
                 start_pan_x = event.x
                 start_pan_y = event.y
                 start_image_x = image_x
                 start_image_y = image_y
-            
+          
             def pan(event):
                 nonlocal image_x, image_y
                 dx = event.x - start_pan_x
@@ -2342,26 +2365,26 @@ class PasswordManager(ctk.CTk):
                 image_x = start_image_x + dx
                 image_y = start_image_y + dy
                 display_image()
-            
+          
             def reset_zoom():
                 nonlocal zoom_level, image_x, image_y
                 zoom_level = 1.0
                 image_x = center
                 image_y = center
                 display_image()
-            
+          
             canvas.bind("<MouseWheel>", on_mouse_wheel)
             canvas.bind("<Button-4>", lambda e: zoom_at(e.x, e.y, 1.1))
             canvas.bind("<Button-5>", lambda e: zoom_at(e.x, e.y, 1 / 1.1))
             canvas.bind("<Button-1>", start_pan)
             canvas.bind("<B1-Motion>", pan)
-            
+          
             btn_frame = ctk.CTkFrame(editor_popup, fg_color=BG)
             btn_frame.pack(pady=10)
             ctk.CTkButton(btn_frame, text="+", command=zoom_in_center, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=40).pack(side="left", padx=5)
             ctk.CTkButton(btn_frame, text="-", command=zoom_out_center, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=40).pack(side="left", padx=5)
             ctk.CTkButton(btn_frame, text="Reset", command=reset_zoom, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=80).pack(side="left", padx=5)
-            
+          
             def apply_crop():
                 w, h = original_img.size
                 orig_left = (w / 2) + (0 - image_x) / zoom_level
@@ -2382,7 +2405,7 @@ class PasswordManager(ctk.CTk):
                 pos_top_in_canvas = image_y + (crop_box[1] - h / 2) * zoom_level
                 final_img = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
                 final_img.paste(resized_cropped, (int(pos_left_in_canvas), int(pos_top_in_canvas)))
-                final_img = final_img.resize((350, 350), Image.LANCZOS)  # Ensure final size
+                final_img = final_img.resize((350, 350), Image.LANCZOS) # Ensure final size
                 orig_ext = os.path.splitext(file)[1].lower()
                 if orig_ext == '.ico':
                     orig_ext = '.png'
@@ -2397,10 +2420,10 @@ class PasswordManager(ctk.CTk):
                             os.remove(old_path)
                 messagebox.showinfo("Success", "Image cropped, resized, and saved!", parent=editor_popup)
                 editor_popup.destroy()
-            
+          
             ctk.CTkButton(editor_popup, text="Apply & Save", command=apply_crop, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(pady=10)
             safe_modal(editor_popup)
-            popup.wait_window(editor_popup)  # 'popup' is the edit_card_popup
+            popup.wait_window(editor_popup) # 'popup' is the edit_card_popup
         ctk.CTkButton(popup, text="Upload Icon", command=upload_icon, fg_color=ACCENT, text_color=BG).pack(pady=(0,8))
         # Auto-query Google Images
         def auto_find_icon():
@@ -2718,104 +2741,6 @@ class PasswordManager(ctk.CTk):
         if path:
             df.to_csv(path, index=False)
             messagebox.showinfo("Exported", f"Exported to {path}")
-    def export_odt(self):
-        if not self._verify_master_password():
-            return
-        odt = OpenDocumentText()
-        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
-            title, user, pwd_enc, notes = row
-            try:
-                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-            except Exception:
-                pwd = ""
-            for text in [f"Title: {title}", f"Username: {user}", f"Password: {pwd}", f"Notes: {notes}", "-"*30]:
-                p = P(text=text)
-                odt.text.addElement(p)
-        path = filedialog.asksaveasfilename(defaultextension=".odt", filetypes=[("OpenDocument","*.odt")])
-        if path:
-            odt.save(path)
-            messagebox.showinfo("Exported", f"Exported to {path}")
-    def export_txt(self):
-        if not self._verify_master_password():
-            return
-        path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text","*.txt")])
-        if path:
-            with open(path, "w", encoding="utf-8") as f:
-                for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
-                    title, user, pwd_enc, notes = row
-                    try:
-                        pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-                    except Exception:
-                        pwd = ""
-                    f.write(f"Title: {title}\n")
-                    f.write(f"Username: {user}\n")
-                    f.write(f"Password: {pwd}\n")
-                    f.write(f"Notes: {notes}\n")
-                    f.write("-"*30 + "\n")
-            messagebox.showinfo("Exported", f"Exported to {path}")
-    def export_xlsx(self):
-        if not self._verify_master_password():
-            return
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.append(["Title", "Username", "Password", "Notes"])
-        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
-            title, user, pwd_enc, notes = row
-            try:
-                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-            except Exception:
-                pwd = ""
-            ws.append([title, user, pwd, notes])
-        path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel","*.xlsx")])
-        if path:
-            wb.save(path)
-            messagebox.showinfo("Exported", f"Exported to {path}")
-    def export_ods(self):
-        if not self._verify_master_password():
-            return
-        doc = OpenDocumentSpreadsheet()
-        table = Table(name="Passwords")
-        doc.spreadsheet.addElement(table)
-        header_row = TableRow()
-        for header in ["Title", "Username", "Password", "Notes"]:
-            cell = TableCell()
-            p = P(text=header)
-            cell.addElement(p)
-            header_row.addElement(cell)
-        table.addElement(header_row)
-        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
-            title, user, pwd_enc, notes = row
-            try:
-                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-            except Exception:
-                pwd = ""
-            data_row = TableRow()
-            for value in [title, user, pwd, notes]:
-                cell = TableCell()
-                p = P(text=value)
-                cell.addElement(p)
-                data_row.addElement(cell)
-            table.addElement(data_row)
-        path = filedialog.asksaveasfilename(defaultextension=".ods", filetypes=[("OpenDocument Spreadsheet","*.ods")])
-        if path:
-            doc.save(path)
-            messagebox.showinfo("Exported", f"Exported to {path}")
-    def export_csv(self):
-        if not self._verify_master_password():
-            return
-        data = []
-        for row in self.c.execute("SELECT title, username, password, notes FROM passwords"):
-            title, user, pwd_enc, notes = row
-            try:
-                pwd = self.fernet.decrypt(pwd_enc.encode()).decode() if pwd_enc else ""
-            except Exception:
-                pwd = ""
-            data.append({"Title": title, "Username": user, "Password": pwd, "Notes": notes})
-        df = pd.DataFrame(data)
-        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV","*.csv")])
-        if path:
-            df.to_csv(path, index=False)
-            messagebox.showinfo("Exported", f"Exported to {path}")
     def export_odp(self):
         if not self._verify_master_password():
             return
@@ -2908,16 +2833,13 @@ class PasswordManager(ctk.CTk):
             messagebox.showinfo("Exported", f"Exported to {path}")
         except Exception as e:
             messagebox.showerror("Error", f"Export failed: {e}")
-
     def export_icons(self):
         export_dir = filedialog.askdirectory(title="Select Export Directory for Icons")
         if not export_dir:
             return
-
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
         archive_name = f"{timestamp}.hawking"
         archive_path = os.path.join(export_dir, archive_name)
-
         count = 0
         with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
             for file in os.listdir(stored_icons_path):
@@ -2925,7 +2847,6 @@ class PasswordManager(ctk.CTk):
                 if os.path.isfile(src):
                     archive.write(src, arcname=file)
                     count += 1
-
         messagebox.showinfo(
             "Exported",
             f"Exported {count} icons to\n{archive_path}"
@@ -3007,7 +2928,6 @@ class PasswordManager(ctk.CTk):
         messagebox.showinfo("Reset Complete", "App reset. Restart the application.")
         self.destroy()
         sys.exit()
-
     def check_for_update(self, auto_check):
         q = queue.Queue()
         def check_task():
@@ -3029,7 +2949,6 @@ class PasswordManager(ctk.CTk):
                 pass
             self.after(100, process_queue)
         self.after(100, process_queue)
-
     def do_update_confirm(self, data, auto_check):
         try:
             title = data.get('name', '').strip()
@@ -3058,7 +2977,6 @@ class PasswordManager(ctk.CTk):
                     messagebox.showinfo("No Update", "You are using the latest version.")
         except Exception as e:
             print(f"Update check failed: {e}")
-
     def change_master_password(self):
         if not self._verify_master_password():
             return
@@ -3096,7 +3014,6 @@ class PasswordManager(ctk.CTk):
         ctk.CTkButton(popup, text="Change", command=change, fg_color=ACCENT, text_color=BG, hover_color=ACCENT_DIM, width=200).pack(pady=12)
         safe_modal(popup)
         self.wait_window(popup)
-
     def _reencrypt_with_new_password(self, new_pwd):
         old_fernet = self.fernet
         new_key = derive_key(new_pwd, self.salt)
@@ -3114,7 +3031,7 @@ class PasswordManager(ctk.CTk):
         if count == 0:
             progress_popup.destroy()
             messagebox.showinfo("Success", "Master password changed (no entries to re-encrypt).")
-            self.master_password = new_pwd  # Update in-memory
+            self.master_password = new_pwd # Update in-memory
             return
         step = 1.0 / count
         current = 0
@@ -3131,16 +3048,16 @@ class PasswordManager(ctk.CTk):
         self.settings["verification"] = new_verif
         self._save_settings()
         self.fernet = new_fernet
-        self.master_password = new_pwd  # Update in-memory for verifies in same session
+        self.master_password = new_pwd # Update in-memory for verifies in same session
         progress_popup.destroy()
         messagebox.showinfo("Success", "Master password changed and entries re-encrypted.")
-        self.load_cards()  # Reload UI to refresh encrypted values in lambdas
-
+        self.load_cards() # Reload UI to refresh encrypted values in lambdas
     def download_and_install(self, data):
         progress_popup = ctk.CTkToplevel(self)
         progress_popup.title("Downloading Update")
         progress_popup.configure(fg_color=BG)
         progress_popup.resizable(False, False)
+        progress_popup.after(250, lambda: PasswordManager.set_window_icon(progress_popup))
         label = ctk.CTkLabel(progress_popup, text="Downloading update...", text_color=TEXT)
         label.pack(pady=10)
         progress_bar = ctk.CTkProgressBar(progress_popup, mode="determinate", width=300)
@@ -3163,7 +3080,7 @@ class PasswordManager(ctk.CTk):
                 with urllib.request.urlopen(req) as response:
                     total_size = int(response.headers.get('Content-Length', 0))
                     downloaded = 0
-                    chunk_size = 1024 * 1024  # 1MB
+                    chunk_size = 1024 * 1024 # 1MB
                     with open(temp_path, 'wb') as out_file:
                         while True:
                             chunk = response.read(chunk_size)
